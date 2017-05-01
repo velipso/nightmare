@@ -1,0 +1,174 @@
+#!/bin/bash
+
+# abort this script on any error
+set -e
+
+# set the target platform; one of: macosx, TODO add more
+PLATFORM=macosx
+
+# goofy way to get the directory the script is in
+pushd "$(dirname "$0")" > /dev/null
+SCRIPT_DIR="$(pwd)"
+popd > /dev/null
+
+SRC_DIR="$SCRIPT_DIR/src"
+TGT_DIR="$SCRIPT_DIR/tgt"
+
+# create the target directory
+mkdir -p "$TGT_DIR"
+
+SDL_DIR="$TGT_DIR/sdl"
+SDL_MAKE=false
+
+# compile SDL if it hasn't been compiled yet
+if [ ! -d "$SDL_DIR" ]; then
+	mkdir -p "$SDL_DIR"
+	SDL_MAKE=true
+fi
+
+LINK=""
+if [ "$PLATFORM" = macosx ]; then
+	LINK="$LINK -framework AppKit"
+	LINK="$LINK -framework AudioToolbox"
+	LINK="$LINK -framework Carbon"
+	LINK="$LINK -framework CoreAudio"
+	LINK="$LINK -framework CoreVideo"
+	LINK="$LINK -framework ForceFeedback"
+	LINK="$LINK -framework IOKit"
+fi
+
+sdl_src(){
+	SDL_SRC="$SRC_DIR/demo/sdl/src/$1"
+	SDL_OBJ="$TGT_DIR/sdl/$(basename -s .m -s .c $SDL_SRC).o"
+	LINK="$LINK $SDL_OBJ"
+	if [ "$SDL_MAKE" = true ]; then
+		if [ "$PLATFORM" = macosx ]; then
+			echo Compiling SDL: $(basename "$SDL_SRC")
+			clang -c                                 \
+				-arch x86_64                         \
+				-mmacosx-version-min=10.6            \
+				-DMAC_OS_X_VERSION_MIN_REQUIRED=1060 \
+				-I/usr/local/include                 \
+				-I"$SRC_DIR/demo/sdl/include"        \
+				-o "$SDL_OBJ"                        \
+				"$SDL_SRC"
+		fi
+	fi
+}
+
+if [ "$PLATFORM" = macosx ]; then
+	sdl_src audio/coreaudio/SDL_coreaudio.m
+	sdl_src file/cocoa/SDL_rwopsbundlesupport.m
+	sdl_src filesystem/cocoa/SDL_sysfilesystem.m
+	sdl_src video/cocoa/SDL_cocoaclipboard.m
+	sdl_src video/cocoa/SDL_cocoaevents.m
+	sdl_src video/cocoa/SDL_cocoakeyboard.m
+	sdl_src video/cocoa/SDL_cocoamessagebox.m
+	sdl_src video/cocoa/SDL_cocoamodes.m
+	sdl_src video/cocoa/SDL_cocoamouse.m
+	sdl_src video/cocoa/SDL_cocoamousetap.m
+	sdl_src video/cocoa/SDL_cocoaopengl.m
+	sdl_src video/cocoa/SDL_cocoashape.m
+	sdl_src video/cocoa/SDL_cocoavideo.m
+	sdl_src video/cocoa/SDL_cocoawindow.m
+
+	SDL_THR="pthread"
+	SDL_TMR="unix"
+	SDL_LSO="dlopen"
+	SDL_JOY="darwin"
+	SDL_HAP="darwin"
+	SDL_PWR="macosx"
+fi
+
+sdl_src SDL.c
+sdl_src SDL_assert.c
+sdl_src SDL_error.c
+sdl_src SDL_hints.c
+sdl_src SDL_log.c
+sdl_src atomic/SDL_atomic.c
+sdl_src atomic/SDL_spinlock.c
+sdl_src audio/SDL_audio.c
+sdl_src audio/SDL_audiocvt.c
+sdl_src audio/SDL_audiotypecvt.c
+sdl_src audio/SDL_mixer.c
+sdl_src audio/SDL_wave.c
+sdl_src audio/disk/SDL_diskaudio.c
+sdl_src audio/dummy/SDL_dummyaudio.c
+sdl_src cpuinfo/SDL_cpuinfo.c
+sdl_src dynapi/SDL_dynapi.c
+sdl_src events/SDL_clipboardevents.c
+sdl_src events/SDL_dropevents.c
+sdl_src events/SDL_events.c
+sdl_src events/SDL_gesture.c
+sdl_src events/SDL_keyboard.c
+sdl_src events/SDL_mouse.c
+sdl_src events/SDL_quit.c
+sdl_src events/SDL_touch.c
+sdl_src events/SDL_windowevents.c
+sdl_src file/SDL_rwops.c
+sdl_src haptic/SDL_haptic.c
+sdl_src haptic/$SDL_HAP/SDL_syshaptic.c
+sdl_src joystick/SDL_gamecontroller.c
+sdl_src joystick/SDL_joystick.c
+sdl_src joystick/$SDL_JOY/SDL_sysjoystick.c
+sdl_src loadso/$SDL_LSO/SDL_sysloadso.c
+sdl_src power/SDL_power.c
+sdl_src power/$SDL_PWR/SDL_syspower.c
+sdl_src render/SDL_render.c
+sdl_src render/SDL_yuv_sw.c
+sdl_src render/opengl/SDL_render_gl.c
+sdl_src render/opengl/SDL_shaders_gl.c
+sdl_src render/software/SDL_blendfillrect.c
+sdl_src render/software/SDL_blendline.c
+sdl_src render/software/SDL_blendpoint.c
+sdl_src render/software/SDL_drawline.c
+sdl_src render/software/SDL_drawpoint.c
+sdl_src render/software/SDL_render_sw.c
+sdl_src render/software/SDL_rotate.c
+sdl_src stdlib/SDL_getenv.c
+sdl_src stdlib/SDL_iconv.c
+sdl_src stdlib/SDL_malloc.c
+sdl_src stdlib/SDL_qsort.c
+sdl_src stdlib/SDL_stdlib.c
+sdl_src stdlib/SDL_string.c
+sdl_src timer/SDL_timer.c
+sdl_src thread/SDL_thread.c
+sdl_src thread/$SDL_THR/SDL_syscond.c
+sdl_src thread/$SDL_THR/SDL_sysmutex.c
+sdl_src thread/$SDL_THR/SDL_syssem.c
+sdl_src thread/$SDL_THR/SDL_systhread.c
+sdl_src thread/$SDL_THR/SDL_systls.c
+sdl_src timer/$SDL_TMR/SDL_systimer.c
+sdl_src video/SDL_blit.c
+sdl_src video/SDL_blit_0.c
+sdl_src video/SDL_blit_1.c
+sdl_src video/SDL_blit_A.c
+sdl_src video/SDL_blit_N.c
+sdl_src video/SDL_blit_auto.c
+sdl_src video/SDL_blit_copy.c
+sdl_src video/SDL_blit_slow.c
+sdl_src video/SDL_bmp.c
+sdl_src video/SDL_clipboard.c
+sdl_src video/SDL_fillrect.c
+sdl_src video/SDL_pixels.c
+sdl_src video/SDL_rect.c
+sdl_src video/SDL_RLEaccel.c
+sdl_src video/SDL_shape.c
+sdl_src video/SDL_stretch.c
+sdl_src video/SDL_surface.c
+sdl_src video/SDL_video.c
+sdl_src video/dummy/SDL_nullevents.c
+sdl_src video/dummy/SDL_nullframebuffer.c
+sdl_src video/dummy/SDL_nullvideo.c
+
+# compile the source files
+# -fwrapv   integers should wrap around like normal
+# -Werror   elevate warnings to errors
+clang                             \
+	-o "$TGT_DIR/nightmare"       \
+	-fwrapv                       \
+	-Werror                       \
+	-I"$SRC_DIR/demo/sdl/include" \
+	$LINK                         \
+	"$SRC_DIR/nightmare.c"        \
+	"$SRC_DIR/demo/main.c"
