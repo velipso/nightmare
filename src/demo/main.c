@@ -140,6 +140,8 @@ int garbage_end = 0;
 int all_files = 0;
 int mid_mthd = 0;
 int mtrk_chunks = 0;
+int div_ticks = 0;
+int div_smpte = 0;
 int64_t total_size = 0;
 
 bool read_midi_chunk(FILE *fp, midi_chunk *chk){
@@ -205,6 +207,12 @@ void process_midi_mthd(midi_chunk chk){
 	}
 	int format = ((int)chk.data[0] << 8) | chk.data[1];
 	int division = ((int)chk.data[4] << 8) | chk.data[5];
+	if (division & 0x8000){
+		div_smpte++;
+		printf("SMPTE: %s\n", curfile);
+	}
+	else
+		div_ticks++;
 }
 
 void process_midi_mtrk(midi_chunk chk){
@@ -283,13 +291,15 @@ int main(){
 		"All chunks       : %d\n"
 		"Misaligned       : %d\n"
 		"Garbage end      : %d\n"
-		"MThd in middle   : %d\n",
+		"MThd in middle   : %d\n"
+		"Division Ticks/SM: %d/%d\n",
 		all_files,
 		(double)total_size / (1024.0 * 1024.0 * 1024.0),
 		aligned_chunks + misaligned_chunks,
 		misaligned_chunks,
 		garbage_end,
-		mid_mthd);
+		mid_mthd,
+		div_ticks, div_smpte);
 
 
 	return 0;

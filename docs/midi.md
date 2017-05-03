@@ -122,7 +122,44 @@ to ignore the field.
 
 ### Division
 
-TODO: THIS
+According to the specification, the division can come in two formats:
+
+<table>
+	<thead>
+		<tr>
+			<th>Division</th>
+			<th>15</th>
+			<th>13</th>
+			<th>13</th>
+			<th>12</th>
+			<th>11</th>
+			<th>10</th>
+			<th>9</th>
+			<th>8</th>
+			<th>7</th>
+			<th>6</th>
+			<th>5</th>
+			<th>4</th>
+			<th>3</th>
+			<th>2</th>
+			<th>1</th>
+			<th>0</th>
+		</tr>
+	</thead>
+	<tbody>
+		<tr>
+			<td>Ticks</td>
+			<td>0</td>
+			<td colspan="15">Ticks per Quarter Note</td>
+		</tr>
+		<tr>
+			<td>SMPTE</td>
+			<td>1</td>
+			<td colspan="7">Negative SMPTE Format</td>
+			<td colspan="8">Ticks per Frame</td>
+		</tr>
+	</tbody>
+</table>
 
 ### `'MThd'` Statistics
 
@@ -134,6 +171,7 @@ TODO: THIS
     * Bad Format: 0.004% (2 of 48216, `boythorn.mid` has `74 01` and `possible.mid` has `70 01`)
 * 0.74% of files have an incorrect Track Chunks count (359 of 48197)
 
-### Track Chunks
+Track Chunk `'MTrk'`
+--------------------
 
 TODO: MORE
