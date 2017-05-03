@@ -29,22 +29,22 @@ MIDI Overview
 
 MIDI is a protocol for transmitting note and controller information across a serial connection.  A
 good mental model is to think of MIDI as the data that comes off a music keyboard *before* being
-synthesized into sound.  For example, there is a Note On message, which indicates that a key has
-been pressed, and a Note Off message when it's released.
+synthesized into sound.  For example, there is a Note On event, which indicates that a key has been
+pressed, and a Note Off event when it's released.
 
 The MIDI protocol is designed to be used in real-time -- as the musician is generating events with
 the keyboard, the data is being transmitted over the wire, which a synthesizer can react to in
 real-time by outputting sound.
 
-In order to store a stream of MIDI messages in a file, messages are timestamped.  This allows a
-program to "play back" the stream of messages at the correct time.
+In order to store a stream of MIDI events in a file, events are timestamped.  This allows a
+program to "play back" the stream of events at the correct time.
 
-The bulk of the complexity is understanding the messages themselves.  The MIDI protocol has
-maintained backwards compatibility, which means it's easy to see the raw bytes that make up a
-message, but understanding how to unpack and interpret each message is complicated.
+The bulk of the complexity is understanding the events themselves.  The MIDI protocol has maintained
+backwards compatibility, which means it's easy to see the raw bytes that make up a event, but
+understanding how to unpack and interpret each event is complicated.
 
 General MIDI 2 is an additional layer of requirements on top of the basic MIDI protocol that further
-specifies the meaning behind messages, and systems/devices claiming to support GM 2 are required to
+specifies the meaning behind events, and systems/devices claiming to support GM 2 are required to
 support a minimum feature set.
 
 Chunks
@@ -90,11 +90,10 @@ The real-world data contains:
 Header Chunk `'MThd'`
 ---------------------
 
-The header chunk has a type of `'MThd'` (`4D 54 68 64`).  The size should always be 6 bytes long
-(i.e., Data Size is `00 00 00 06`).
-
 | Name         | Size                 | Description                        |
 |--------------|----------------------|------------------------------------|
+| Chunk Type   | 4 bytes              | `'MThd'` (`4D 54 68 64`)           |
+| Data Size    | 4 bytes (big endian) | 6 (`00 00 00 06`)                  |
 | Format       | 2 bytes (big endian) | `0`, `1`, or `2`, described below  |
 | Track Chunks | 2 bytes (big endian) | Number of track chunks in the file |
 | Division     | 2 bytes (big endian) | Timestamp format, described below  |
@@ -124,46 +123,16 @@ to ignore the field.
 
 According to the specification, the division can come in two formats:
 
-<table>
-	<thead>
-		<tr>
-			<th>&nbsp;</th>
-			<th colspan="16">Bits</th>
-		</tr>
-		<tr>
-			<th>&nbsp;</th>
-			<th>15</th>
-			<th>14</th>
-			<th>13</th>
-			<th>12</th>
-			<th>11</th>
-			<th>10</th>
-			<th>9</th>
-			<th>8</th>
-			<th>7</th>
-			<th>6</th>
-			<th>5</th>
-			<th>4</th>
-			<th>3</th>
-			<th>2</th>
-			<th>1</th>
-			<th>0</th>
-		</tr>
-	</thead>
-	<tbody>
-		<tr>
-			<td>Ticks</td>
-			<td>0</td>
-			<td colspan="15">Ticks per Quarter Note</td>
-		</tr>
-		<tr>
-			<td>SMPTE</td>
-			<td>1</td>
-			<td colspan="7">Negative SMPTE Format</td>
-			<td colspan="8">Ticks per Frame</td>
-		</tr>
-	</tbody>
-</table>
+1. If bit 15 is cleared, then bits 14-0 represent the ticks per quarter note
+2. If bit 15 is set, then bits 14-8 represent the negative SMPTE format, and bits 7-0 represent the
+   ticks per frame
+
+In practice, no files have bit 15 set (other than `ffmqbatl.mid` which has it set due to a corrupted
+header).  If someone can find me some test MIDI files that use SMPTE timing, then I would love to
+look into it.  Otherwise, I will just reject files that have bit 15 set.
+
+All MIDI files should specify the time signature and tempo as events inside the `'MTrk'` chunk.  If
+they don't, the default values are 4/4 time signature, and 120 beats per minute.
 
 ### `'MThd'` Statistics
 
@@ -174,8 +143,60 @@ According to the specification, the division can come in two formats:
     * Format 2: 0.05% (23 of 48216)
     * Bad Format: 0.004% (2 of 48216, `boythorn.mid` has `74 01` and `possible.mid` has `70 01`)
 * 0.74% of files have an incorrect Track Chunks count (359 of 48197)
+* Division values range from 2 to 25000, with the most common values being:
+    * 120: 28.9% (13948 of 48213)
+    * 480: 16.2% (7809 of 48213)
+    * 192: 16.1% (7746 of 48213)
+    * 384: 15.2% (7316 of 48213)
+    * 240: 10.2% (4939 of 48213)
+    * 96: 9.9% (4770 of 48213)
 
 Track Chunk `'MTrk'`
 --------------------
 
-TODO: MORE
+Track chunks consist of a stream of timestamped events.
+
+| Name        | Size                 | Description                                                |
+|-------------|----------------------|------------------------------------------------------------|
+| Chunk Type  | 4 bytes              | `'MTrk'` (`4D 54 72 6B`)                                   |
+| Data Size   | 4 bytes (big endian) | Length of the data (not including Chunk Type of Data Size) |
+| MTrk Events | Data Size            | One or more MTrk events                                    |
+
+A single MTrk event consists of a delta timestamp and an event:
+
+| Name            | Size            | Description                                                 |
+|-----------------|-----------------|-------------------------------------------------------------|
+| Delta Timestamp | Variable Length | Number of ticks this event occurs relative to previous event|
+| Event           | Varies          | A MIDI event, SysEx event, or Meta event                    |
+
+### Variable Length Quantities
+
+Some MTrk events contain Variable Length quantities, like the Delta Timestamp.  This is a 32-bit
+integer with a maximum value of `0FFFFFFF` (*not* `FFFFFFFF`).  It is encoded 7 bits at a time,
+where the most significant bit is set to indicate more bytes need to be read.
+
+The encoding ranges from 1 to 4 bytes, with the following binary decodings:
+
+| Encoding                              | Decoding                              |
+|---------------------------------------|---------------------------------------|
+| `0aaaaaaa`                            | `00000000 00000000 00000000 0aaaaaaa` |
+| `1aaaaaaa 0bbbbbbb`                   | `00000000 00000000 00aaaaaa abbbbbbb` |
+| `1aaaaaaa 1bbbbbbb 0ccccccc`          | `00000000 000aaaaa aabbbbbb bccccccc` |
+| `1aaaaaaa 1bbbbbbb 1ccccccc 0ddddddd` | `0000aaaa aaabbbbb bbcccccc cddddddd` |
+
+Examples:
+
+| Encoding      | Decoding   |
+|---------------|------------|
+| `00`          | `00000000` |
+| `67`          | `00000067` |
+| `7F`          | `0000007F` |
+| `81 00`       | `00000080` |
+| `C6 45`       | `00002345` |
+| `FF 7F`       | `00003FFF` |
+| `81 80 00`    | `00004000` |
+| `C8 E8 56`    | `00123456` |
+| `FF FF 7F`    | `001FFFFF` |
+| `81 80 80 00` | `00200000` |
+| `C4 EA F9 5E` | `089ABCDE` |
+| `FF FF FF 7F` | `0FFFFFFF` |

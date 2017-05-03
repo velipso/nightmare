@@ -102,6 +102,17 @@ typedef struct {
 	uint8_t *data;
 } midi_chunk;
 
+typedef enum {
+	MTHD_SINGLE,
+	MTHD_PARALLEL,
+	MTHD_SEQUENCE
+} midi_chunk_mthd_format;
+
+typedef struct {
+	midi_chunk_mthd_format format;
+	int ticks;
+} midi_chunk_mthd;
+
 const char *curfile;
 
 bool is_chunk_type(uint32_t type){
@@ -140,8 +151,6 @@ int garbage_end = 0;
 int all_files = 0;
 int mid_mthd = 0;
 int mtrk_chunks = 0;
-int div_ticks = 0;
-int div_smpte = 0;
 int64_t total_size = 0;
 
 bool read_midi_chunk(FILE *fp, midi_chunk *chk){
@@ -200,19 +209,24 @@ bool read_midi_chunk(FILE *fp, midi_chunk *chk){
 	return true;
 }
 
-void process_midi_mthd(midi_chunk chk){
+bool process_midi_mthd(midi_chunk chk, midi_chunk_mthd *mthd){
 	if (chk.size < 6){
-		printf("MThd chunk size too small: %s\n", curfile);
-		return;
+		fprintf(stderr, "MThd chunk size too small: %s\n", curfile);
+		return false;
 	}
 	int format = ((int)chk.data[0] << 8) | chk.data[1];
 	int division = ((int)chk.data[4] << 8) | chk.data[5];
-	if (division & 0x8000){
-		div_smpte++;
-		printf("SMPTE: %s\n", curfile);
+	if (format != 0 && format != 1 && format != 2){
+		fprintf(stderr, "Bad header format %d: %s\n", format, curfile);
+		return false;
 	}
-	else
-		div_ticks++;
+	if (division & 0x8000){
+		fprintf(stderr, "Unsupported time division using SMPTE timings: %s\n", curfile);
+		return false;
+	}
+	mthd->format = format == 0 ? MTHD_SINGLE : (format == 1 ? MTHD_PARALLEL : MTHD_SEQUENCE);
+	mthd->ticks = division;
+	return true;
 }
 
 void process_midi_mtrk(midi_chunk chk){
@@ -233,14 +247,20 @@ void process_midi(const char *file){
 	fseek(fp, 0L, SEEK_SET);
 
 	midi_chunk chk;
+	midi_chunk_mthd mthd;
 	if (!read_midi_chunk(fp, &chk)){
 		fclose(fp);
 		return;
 	}
 	if (chk.type != 0x4D546864) // MThd
 		printf("MThd isn't always first chunk: %s\n", curfile);
-	else
-		process_midi_mthd(chk);
+	else{
+		if (!process_midi_mthd(chk, &mthd)){
+			nm_free(chk.data);
+			fclose(fp);
+			return;
+		}
+	}
 	nm_free(chk.data);
 
 	//
@@ -262,7 +282,8 @@ void process_midi(const char *file){
 		}
 		if (chk.type == 0x4D546864){
 			mid_mthd++;
-			process_midi_mthd(chk);
+			midi_chunk_mthd h2;
+			process_midi_mthd(chk, &h2);
 		}
 		else if (chk.type == 0x4D54726B){
 			mtrk_chunks++;
@@ -291,16 +312,13 @@ int main(){
 		"All chunks       : %d\n"
 		"Misaligned       : %d\n"
 		"Garbage end      : %d\n"
-		"MThd in middle   : %d\n"
-		"Division Ticks/SM: %d/%d\n",
+		"MThd in middle   : %d\n",
 		all_files,
 		(double)total_size / (1024.0 * 1024.0 * 1024.0),
 		aligned_chunks + misaligned_chunks,
 		misaligned_chunks,
 		garbage_end,
-		mid_mthd,
-		div_ticks, div_smpte);
-
+		mid_mthd);
 
 	return 0;
 }
