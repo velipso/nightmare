@@ -148,15 +148,15 @@ According to the specification, the division can come in two formats:
 	</thead>
 	<tbody>
 		<tr>
-			<td style="text-align: center;">Ticks</td>
-			<td style="text-align: center;">0</td>
-			<td colspan="15" style="text-align: center;">Ticks per Quarter Note</td>
+			<td center>Ticks</td>
+			<td center>0</td>
+			<td colspan="15" center>Ticks per Quarter Note</td>
 		</tr>
 		<tr>
-			<td style="text-align: center;">SMPTE</td>
-			<td style="text-align: center;">1</td>
-			<td colspan="7" style="text-align: center;">Negative SMPTE Format</td>
-			<td colspan="8" style="text-align: center;">Ticks per Frame</td>
+			<td center>SMPTE</td>
+			<td center>1</td>
+			<td colspan="7" center>Negative SMPTE Format</td>
+			<td colspan="8" center>Ticks per Frame</td>
 		</tr>
 	</tbody>
 </table>
