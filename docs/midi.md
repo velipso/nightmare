@@ -167,13 +167,14 @@ A single MTrk event consists of a delta timestamp and an event:
 | Name            | Size            | Description                                                 |
 |-----------------|-----------------|-------------------------------------------------------------|
 | Delta Timestamp | Variable Length | Number of ticks this event occurs relative to previous event|
-| Event           | Varies          | A MIDI event, SysEx event, or Meta event                    |
+| Event           | varies according to event | A MIDI event, SysEx event, or Meta event          |
 
 ### Variable Length Quantities
 
 Some MTrk events contain Variable Length quantities, like the Delta Timestamp.  This is a 32-bit
-integer with a maximum value of `0FFFFFFF` (*not* `FFFFFFFF`).  It is encoded 7 bits at a time,
-where the most significant bit is set to indicate more bytes need to be read.
+integer with a maximum value of `0FFFFFFF` (*not* `FFFFFFFF`).  It is encoded 7 bits per byte,
+most significant bits first, where the most significant bit of each encoded byte is reserved to
+indicate whether more bytes need to be read.
 
 The encoding ranges from 1 to 4 bytes, with the following binary decodings:
 
