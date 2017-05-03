@@ -167,7 +167,7 @@ A single MTrk event consists of a delta timestamp and an event:
 | Name            | Size         | Description                                                    |
 |-----------------|--------------|----------------------------------------------------------------|
 | Delta Timestamp | Variable Int | Number of ticks this event occurs relative to previous event   |
-| Event           | Varies according to event | Channel Message or System Message event           |
+| Event           | Varies according to event | Channel Message, SysEx Event, or Meta Event       |
 
 ### Variable Int Quantities
 
@@ -213,52 +213,64 @@ type.  For example, `94` is a Note-On message for channel 5.
 | `8n`    | Note (`00` to `7F`)     | Release Velocity (`00` to `7F`) | Note-Off                  |
 | `9n`    | Note (`00` to `7F`)     | Hit Velocity (`00` to `7F`)     | Note-On                   |
 | `An`    | Poly Key (`00` to `7F`) | Pressure (`00` to `7F`)         | Poly Key Pressure         |
-| `Bn`    | Control (`00` to `77`)  | Value (`00` to `7F`)            | Control Change            |
+| `Bn`    | Control (`00` to `7F`)  | Value (`00` to `7F`)            | Control Change            |
 | `Cn`    | Patch (`00` to `7F`)    | N/A                             | Program Change            |
 | `Dn`    | Pressure (`00` to `7F`) | N/A                             | Channel Pressure          |
 | `En`    | Bend Change LSB (`00` to `7F`) | Bend Change MSB (`00` to `7F`) | Pitch Bend          |
 
 ```
 (Control Change Status) BnH
-78 All Sound Off
-79 Reset All Controllers
-7A Local Control
-7B All Notes Off
-7C Omni Off
-7D Omni On
-7E Mono On (Poly Off)
-7F Poly On (Mono Off)
+00-77 bunch of stuff
+78 00 All Sound Off
+79 00 Reset All Controllers
+7A 00 off, 7F on Local Control
+7B 00 All Notes Off
+7C 00 Omni Off
+7D 00 Omni On
+7E MM (number of channels, 00 for all) Mono On (Poly Off)
+7F 00 Poly On (Mono Off)
 ```
 
-### System Messages
+### SysEx Event
 
-<table>
-    <thead><tr><th>Message</th><th>Description</th></tr></thead>
-    <tbody>
-        <tr><td><code>F0</code></td><td>System Exclusive</td></tr>
-        <tr><td colspan="2">System Common Messages</td></tr>
-        <tr><td><code>F1</code></td><td>MIDI Time Code Quarter Frame</td></tr>
-        <tr><td><code>F2</code></td><td>Song Position Pointer</td></tr>
-        <tr><td><code>F3</code></td><td>Song Select</td></tr>
-        <tr><td><code>F4</code></td><td>Undefined</td></tr>
-        <tr><td><code>F5</code></td><td>Undefined</td></tr>
-        <tr><td><code>F6</code></td><td>Tune Request</td></tr>
-        <tr><td><code>F7</code></td><td>EOX (End of Exclusive)</td></tr>
-        <tr><td colspan="2">System Real-Time Messages</td></tr>
-        <tr><td><code>F8</code></td><td>Timing Clock</td></tr>
-        <tr><td><code>F9</code></td><td>Undefined</td></tr>
-        <tr><td><code>FA</code></td><td>Start</td></tr>
-        <tr><td><code>FB</code></td><td>Continue</td></tr>
-        <tr><td><code>FC</code></td><td>Stop</td></tr>
-        <tr><td><code>FD</code></td><td>Undefined</td></tr>
-        <tr><td><code>FE</code></td><td>Active Sensing</td></tr>
-        <tr><td><code>FF</code></td><td>System Reset</td></tr>
-    </tbody>
-</table>
+`F0`, `F7`
 
+TODO
 
+### Meta Event
 
+Meta Events are always at least 3 bytes in length.
 
+The first byte is `FF` which is what identifies the event as a Meta Event.
 
+The second byte determines the type of meta event.
 
+The third byte determines the byte length of the remaining parameters.  This is useful because you
+don't need to understand the meta event type in order to skip over the event.
 
+Any parameters spanning multiple bytes should be interpreted as big endian.
+
+| Byte Sequence       | Description                                                               |
+|---------------------|---------------------------------------------------------------------------|
+| `FF 00 02 SS SS`    | Sequence Number `SSSS`                                                    |
+| `FF 01 LL text`     | Generic Text of length `LL`                                               |
+| `FF 02 LL text`     | Copyright Notice of length `LL`                                           |
+| `FF 03 LL text`     | Track Name of length `LL`                                                 |
+| `FF 04 LL text`     | Instrument Name of length `LL`                                            |
+| `FF 05 LL text`     | Lyric of length `LL`                                                      |
+| `FF 06 LL text`     | Marker of length `LL` ('First Verse', 'Chrous', etc)                      |
+| `FF 07 LL text`     | Cue Point of length `LL` ('curtain opens', 'character is slapped', etc)   |
+| `FF 20 01 NN`       | Channel Prefix, select channel `NN` (0-15) for future SysEx/Meta events   |
+| `FF 51 03 TT TT TT` | Set Tempo, in `TTTTTT` microseconds per MIDI quarter-note                 |
+| `FF 54 05 HH MM SS RR TT` | SMPTE Offset, hour, minute, second, frame, 1/100th of frame         |
+| `FF 58 04 NN MM LL TT` | Time Signature, see below for details                                  |
+| `FF 59 02 SS MM`    | Key Signature, see below for details                                      |
+| `FF 7F LL data`     | Sequencer-Specific Meta Event, see below for details                      |
+
+#### Time Signature Meta Event
+
+TODO
+
+#### Key Signature Meta Event
+
+TODO
