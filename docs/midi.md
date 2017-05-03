@@ -127,7 +127,7 @@ According to the specification, the division can come in two formats:
 <table>
 	<thead>
 		<tr>
-			<th>Division</th>
+			<th>&nbsp;</th>
 			<th>15</th>
 			<th>13</th>
 			<th>13</th>
@@ -148,15 +148,15 @@ According to the specification, the division can come in two formats:
 	</thead>
 	<tbody>
 		<tr>
-			<td>Ticks</td>
-			<td>0</td>
-			<td colspan="15">Ticks per Quarter Note</td>
+			<td style="text-align: center;">Ticks</td>
+			<td style="text-align: center;">0</td>
+			<td colspan="15" style="text-align: center;">Ticks per Quarter Note</td>
 		</tr>
 		<tr>
-			<td>SMPTE</td>
-			<td>1</td>
-			<td colspan="7">Negative SMPTE Format</td>
-			<td colspan="8">Ticks per Frame</td>
+			<td style="text-align: center;">SMPTE</td>
+			<td style="text-align: center;">1</td>
+			<td colspan="7" style="text-align: center;">Negative SMPTE Format</td>
+			<td colspan="8" style="text-align: center;">Ticks per Frame</td>
 		</tr>
 	</tbody>
 </table>
