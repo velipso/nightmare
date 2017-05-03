@@ -229,7 +229,125 @@ bool process_midi_mthd(midi_chunk chk, midi_chunk_mthd *mthd){
 	return true;
 }
 
-void process_midi_mtrk(midi_chunk chk){
+bool process_midi_mtrk(midi_chunk chk){
+	double tempo = 120;
+	int timesig_num = 4;
+	int timesig_den = 4;
+	int pos = 0;
+	while (pos < chk.size){
+		// read delta as variable int
+		int dt = 0;
+		int len = 0;
+		while (true){
+			len++;
+			int t = chk.data[pos++];
+			if (t & 0x80){
+				if (pos >= chk.size)
+					return false;
+				dt = (dt << 7) | (t & 0x7F);
+			}
+			else{
+				dt = (dt << 7) | t;
+				break;
+			}
+		}
+		if (len > 4){
+			printf("bad time code\n");
+			return false;
+		}
+		printf("%4d | ", dt);
+		if (pos >= chk.size)
+			return false;
+		int msg = chk.data[pos++];
+		if (msg >= 0x80 && msg < 0x90){ // Note-Off
+			if (pos + 1 >= chk.size){
+				printf("bad note off message, out of data\n");
+				return false;
+			}
+			int note = chk.data[pos++];
+			int vel = chk.data[pos++];
+			if (note >= 0x80)
+				printf("bad note off message, note is too high\n");
+			if (vel >= 0x80)
+				printf("bad note off message, vel is too high\n");
+			printf("%% [%X] note off %02X %02X\n", msg & 0xF, note, vel);
+		}
+		else if (msg >= 0x90 && msg < 0xA0){ // Note-On
+			if (pos + 1 >= chk.size){
+				printf("bad note on message, out of data\n");
+				return false;
+			}
+			int note = chk.data[pos++];
+			int vel = chk.data[pos++];
+			if (note >= 0x80)
+				printf("bad note on message, note is too high\n");
+			if (vel >= 0x80)
+				printf("bad note on message, vel is too high\n");
+			printf("%% [%X] note on  %02X %02X\n", msg & 0xF, note, vel);
+		}
+		else if (msg >= 0xA0 && msg < 0xB0){ // Poly Key Pressure
+			if (pos + 1 >= chk.size){
+				printf("bad poly key message, out of data\n");
+				return false;
+			}
+			int p1 = chk.data[pos++];
+			int p2 = chk.data[pos++];
+			if (p1 >= 0x80)
+				printf("bad poly key message, p1 too high\n");
+			if (p2 >= 0x80)
+				printf("bad poly key message, p2 too high\n");
+			printf("%% [%X] poly key %02X %02X\n", msg & 0xF, p1, p2);
+		}
+		else if (msg >= 0xB0 && msg < 0xC0){ // Control Change
+			if (pos + 1 >= chk.size){
+				printf("bad control message, out of data\n");
+				return false;
+			}
+			int p1 = chk.data[pos++];
+			int p2 = chk.data[pos++];
+			if (p1 >= 0x80)
+				printf("bad control message, p1 too high\n");
+			if (p2 >= 0x80)
+				printf("bad control message, p2 too high\n");
+			printf("%% [%X] control  %02X %02X\n", msg & 0xF, p1, p2);
+		}
+		else if (msg >= 0xC0 && msg < 0xD0){ // Program Change
+			if (pos >= chk.size){
+				printf("bad program message, out of data\n");
+				return false;
+			}
+			int patch = chk.data[pos++];
+			if (patch >= 0x80)
+				printf("bad program message, patch is too high\n");
+			printf("%% [%X] program  %02X\n", msg & 0xF, patch);
+		}
+		else if (msg >= 0xD0 && msg < 0xE0){ // Channel Pressure
+			if (pos >= chk.size){
+				printf("bad pressure message, out of data\n");
+				return false;
+			}
+			int p = chk.data[pos++];
+			if (p >= 0x80)
+				printf("bad pressure message, p is too high\n");
+			printf("%% [%X] pressure %02X\n", msg & 0xF, p);
+		}
+		else if (msg >= 0xE0 && msg < 0xF0){ // Pitch Bend
+			if (pos + 1 >= chk.size){
+				printf("bad pitch b message, out of data\n");
+				return false;
+			}
+			int p1 = chk.data[pos++];
+			int p2 = chk.data[pos++];
+			if (p1 >= 0x80)
+				printf("bad pitch b message, p1 too high\n");
+			if (p2 >= 0x80)
+				printf("bad pitch b message, p2 too high\n");
+			printf("%% [%X] pitch b  %02X %02X\n", msg & 0xF, p1, p2);
+		}
+		else
+			printf("unknown message: %02X\n", msg);
+	}
+	return true;
 }
 
 void process_midi(const char *file){
@@ -289,6 +407,8 @@ void process_midi(const char *file){
 			mtrk_chunks++;
 			process_midi_mtrk(chk);
 		}
+		else
+			printf("Not processing chunk type %08X: %s\n", chk.type, curfile);
 		nm_free(chk.data);
 	}
 	fclose(fp);
@@ -300,10 +420,11 @@ int main(){
 	//SDL_Quit();
 
 	const char *root = "/Users/sean/Downloads/midi/data";
-	fs_readdir(root, each_midi);
+	//fs_readdir(root, each_midi);
 	//process_midi("/Users/sean/Downloads/midi/data/f/For_Those_About_To_Rock.MID");
 	//process_midi("/Users/sean/Downloads/midi/data/c/cantina13.mid");
 	//process_midi("/Users/sean/Downloads/midi/data/q/qfg4open.mid");
+	process_midi("/Users/sean/Downloads/midi/data/m/mario.mid");
 
 	printf(
 		"-----------------------\n"

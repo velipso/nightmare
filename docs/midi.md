@@ -164,14 +164,14 @@ Track chunks consist of a stream of timestamped events.
 
 A single MTrk event consists of a delta timestamp and an event:
 
-| Name            | Size            | Description                                                 |
-|-----------------|-----------------|-------------------------------------------------------------|
-| Delta Timestamp | Variable Length | Number of ticks this event occurs relative to previous event|
-| Event           | varies according to event | A MIDI event, SysEx event, or Meta event          |
+| Name            | Size         | Description                                                    |
+|-----------------|--------------|----------------------------------------------------------------|
+| Delta Timestamp | Variable Int | Number of ticks this event occurs relative to previous event   |
+| Event           | Varies according to event | Channel Message or System Message event           |
 
-### Variable Length Quantities
+### Variable Int Quantities
 
-Some MTrk events contain Variable Length quantities, like the Delta Timestamp.  This is a 32-bit
+Some MTrk events contain Variable Int quantities, like the Delta Timestamp.  This is a 32-bit
 integer with a maximum value of `0FFFFFFF` (*not* `FFFFFFFF`).  It is encoded 7 bits per byte,
 most significant bits first, where the most significant bit of each encoded byte is reserved to
 indicate whether more bytes need to be read.
@@ -201,3 +201,64 @@ Examples:
 | `81 80 80 00` | `00200000` |
 | `C4 EA F9 5E` | `089ABCDE` |
 | `FF FF FF 7F` | `0FFFFFFF` |
+
+### Channel Messages
+
+Channel Messages start with a single byte in the range `80` to `EF`.  The lower 4 bits represent
+the channel `n` (0-15 are usually displayed as 1-16), and the higher 4 bits represent the message
+type.  For example, `94` is a Note-On message for channel 5.
+
+| Message | Parameter 1             | Parameter 2                     | Description               |
+|---------|-------------------------|---------------------------------|---------------------------|
+| `8n`    | Note (`00` to `7F`)     | Release Velocity (`00` to `7F`) | Note-Off                  |
+| `9n`    | Note (`00` to `7F`)     | Hit Velocity (`00` to `7F`)     | Note-On                   |
+| `An`    | Poly Key (`00` to `7F`) | Pressure (`00` to `7F`)         | Poly Key Pressure         |
+| `Bn`    | Control (`00` to `77`)  | Value (`00` to `7F`)            | Control Change            |
+| `Cn`    | Patch (`00` to `7F`)    | N/A                             | Program Change            |
+| `Dn`    | Pressure (`00` to `7F`) | N/A                             | Channel Pressure          |
+| `En`    | Bend Change LSB (`00` to `7F`) | Bend Change MSB (`00` to `7F`) | Pitch Bend          |
+
+```
+(Control Change Status) BnH
+78 All Sound Off
+79 Reset All Controllers
+7A Local Control
+7B All Notes Off
+7C Omni Off
+7D Omni On
+7E Mono On (Poly Off)
+7F Poly On (Mono Off)
+```
+
+### System Messages
+
+<table>
+    <thead><tr><th>Message</th><th>Description</th></tr></thead>
+    <tbody>
+        <tr><td>`F0`</td><td>System Exclusive</td></tr>
+        <tr><td colspan="2">System Common Messages</td></tr>
+        <tr><td>`F1`</td><td>MIDI Time Code Quarter Frame</td></tr>
+        <tr><td>`F2`</td><td>Song Position Pointer</td></tr>
+        <tr><td>`F3`</td><td>Song Select</td></tr>
+        <tr><td>`F4`</td><td>Undefined</td></tr>
+        <tr><td>`F5`</td><td>Undefined</td></tr>
+        <tr><td>`F6`</td><td>Tune Request</td></tr>
+        <tr><td>`F7`</td><td>EOX (End of Exclusive)</td></tr>
+        <tr><td colspan="2">System Real-Time Messages</td></tr>
+        <tr><td>`F8`</td><td>Timing Clock</td></tr>
+        <tr><td>`F9`</td><td>Undefined</td></tr>
+        <tr><td>`FA`</td><td>Start</td></tr>
+        <tr><td>`FB`</td><td>Continue</td></tr>
+        <tr><td>`FC`</td><td>Stop</td></tr>
+        <tr><td>`FD`</td><td>Undefined</td></tr>
+        <tr><td>`FE`</td><td>Active Sensing</td></tr>
+        <tr><td>`FF`</td><td>System Reset</td></tr>
+    </tbody>
+</table>
+
+
+
+
+
+
+
