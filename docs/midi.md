@@ -235,24 +235,24 @@ type.  For example, `94` is a Note-On message for channel 5.
 <table>
     <thead><tr><th>Message</th><th>Description</th></tr></thead>
     <tbody>
-        <tr><td>`F0`</td><td>System Exclusive</td></tr>
+        <tr><td><code>F0</code></td><td>System Exclusive</td></tr>
         <tr><td colspan="2">System Common Messages</td></tr>
-        <tr><td>`F1`</td><td>MIDI Time Code Quarter Frame</td></tr>
-        <tr><td>`F2`</td><td>Song Position Pointer</td></tr>
-        <tr><td>`F3`</td><td>Song Select</td></tr>
-        <tr><td>`F4`</td><td>Undefined</td></tr>
-        <tr><td>`F5`</td><td>Undefined</td></tr>
-        <tr><td>`F6`</td><td>Tune Request</td></tr>
-        <tr><td>`F7`</td><td>EOX (End of Exclusive)</td></tr>
+        <tr><td><code>F1</code></td><td>MIDI Time Code Quarter Frame</td></tr>
+        <tr><td><code>F2</code></td><td>Song Position Pointer</td></tr>
+        <tr><td><code>F3</code></td><td>Song Select</td></tr>
+        <tr><td><code>F4</code></td><td>Undefined</td></tr>
+        <tr><td><code>F5</code></td><td>Undefined</td></tr>
+        <tr><td><code>F6</code></td><td>Tune Request</td></tr>
+        <tr><td><code>F7</code></td><td>EOX (End of Exclusive)</td></tr>
         <tr><td colspan="2">System Real-Time Messages</td></tr>
-        <tr><td>`F8`</td><td>Timing Clock</td></tr>
-        <tr><td>`F9`</td><td>Undefined</td></tr>
-        <tr><td>`FA`</td><td>Start</td></tr>
-        <tr><td>`FB`</td><td>Continue</td></tr>
-        <tr><td>`FC`</td><td>Stop</td></tr>
-        <tr><td>`FD`</td><td>Undefined</td></tr>
-        <tr><td>`FE`</td><td>Active Sensing</td></tr>
-        <tr><td>`FF`</td><td>System Reset</td></tr>
+        <tr><td><code>F8</code></td><td>Timing Clock</td></tr>
+        <tr><td><code>F9</code></td><td>Undefined</td></tr>
+        <tr><td><code>FA</code></td><td>Start</td></tr>
+        <tr><td><code>FB</code></td><td>Continue</td></tr>
+        <tr><td><code>FC</code></td><td>Stop</td></tr>
+        <tr><td><code>FD</code></td><td>Undefined</td></tr>
+        <tr><td><code>FE</code></td><td>Active Sensing</td></tr>
+        <tr><td><code>FF</code></td><td>System Reset</td></tr>
     </tbody>
 </table>
 
