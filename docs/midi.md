@@ -212,7 +212,7 @@ type.  For example, `94` is a Note-On message for channel 5.
 |---------|-------------------------|---------------------------------|---------------------------|
 | `8n`    | Note (`00` to `7F`)     | Release Velocity (`00` to `7F`) | Note-Off                  |
 | `9n`    | Note (`00` to `7F`)     | Hit Velocity (`00` to `7F`)     | Note-On                   |
-| `An`    | Poly Key (`00` to `7F`) | Pressure (`00` to `7F`)         | Poly Key Pressure         |
+| `An`    | Note (`00` to `7F`)     | Pressure (`00` to `7F`)         | Note Pressure             |
 | `Bn`    | Control (`00` to `7F`)  | Value (`00` to `7F`)            | Control Change            |
 | `Cn`    | Patch (`00` to `7F`)    | N/A                             | Program Change            |
 | `Dn`    | Pressure (`00` to `7F`) | N/A                             | Channel Pressure          |
@@ -230,6 +230,10 @@ type.  For example, `94` is a Note-On message for channel 5.
 7E MM (number of channels, 00 for all) Mono On (Poly Off)
 7F 00 Poly On (Mono Off)
 ```
+
+#### Running Status
+
+TODO: running status only applies to Channel Messages
 
 ### SysEx Event
 
@@ -261,6 +265,8 @@ Any parameters spanning multiple bytes should be interpreted as big endian.
 | `FF 06 LL text`     | Marker of length `LL` ('First Verse', 'Chrous', etc)                      |
 | `FF 07 LL text`     | Cue Point of length `LL` ('curtain opens', 'character is slapped', etc)   |
 | `FF 20 01 NN`       | Channel Prefix, select channel `NN` (0-15) for future SysEx/Meta events   |
+| `FF 21 01 PP`       | MIDI Port, select output port `PP` for MIDI events                        |
+| `FF 2F 00`          | End of Track, required as last event in a MTrk chunk                      |
 | `FF 51 03 TT TT TT` | Set Tempo, in `TTTTTT` microseconds per MIDI quarter-note                 |
 | `FF 54 05 HH MM SS RR TT` | SMPTE Offset, hour, minute, second, frame, 1/100th of frame         |
 | `FF 58 04 NN MM LL TT` | Time Signature, see below for details                                  |
@@ -272,5 +278,9 @@ Any parameters spanning multiple bytes should be interpreted as big endian.
 TODO
 
 #### Key Signature Meta Event
+
+TODO
+
+#### Sequencer-Specific Meta Event
 
 TODO

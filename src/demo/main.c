@@ -12,12 +12,6 @@
 #include <dirent.h>
 #include <sys/stat.h>
 
-typedef void *(*nm_alloc_func)(size_t sz);
-typedef void (*nm_free_func)(void *ptr);
-
-nm_alloc_func nm_alloc = malloc;
-nm_free_func nm_free = free;
-
 static bool fs_isdir(const char *dir){
 	struct stat buf;
 	if (stat(dir, &buf) != 0)
@@ -234,6 +228,8 @@ bool process_midi_mtrk(midi_chunk chk){
 	int timesig_num = 4;
 	int timesig_den = 4;
 	int pos = 0;
+	//printf("* start of mtrk\n");
+	int running_status = -1;
 	while (pos < chk.size){
 		// read delta as variable int
 		int dt = 0;
@@ -242,8 +238,10 @@ bool process_midi_mtrk(midi_chunk chk){
 			len++;
 			int t = chk.data[pos++];
 			if (t & 0x80){
-				if (pos >= chk.size)
+				if (pos >= chk.size){
+					printf("\nbad time code\n");
 					return false;
+				}
 				dt = (dt << 7) | (t & 0x7F);
 			}
 			else{
@@ -252,101 +250,196 @@ bool process_midi_mtrk(midi_chunk chk){
 			}
 		}
 		if (len > 4){
-			printf("bad time code\n");
+			printf("\nbad time code\n");
 			return false;
 		}
-		printf("%4d | ", dt);
-		if (pos >= chk.size)
+		//printf("|%4d | ", dt);
+		if (pos >= chk.size){
+			printf("\nmissing message\n");
 			return false;
+		}
 		int msg = chk.data[pos++];
-		if (msg >= 0x80 && msg < 0x90){ // Note-Off
-			if (pos + 1 >= chk.size){
-				printf("bad note off message, out of data\n");
+		if (msg < 0x80){
+			// use running status
+			if (running_status < 0){
+				printf("\nexpecting running status %02X: %s\n", msg, curfile);
 				return false;
 			}
+			else{
+				msg = running_status;
+				pos--;
+			}
+		}
+		//printf("%4d %02X\n", dt, msg);
+		if (msg >= 0x80 && msg < 0x90){ // Note-Off
+			if (pos + 1 >= chk.size){
+				printf("\nbad note off message, out of data\n");
+				return false;
+			}
+			running_status = msg;
 			int note = chk.data[pos++];
 			int vel = chk.data[pos++];
 			if (note >= 0x80)
 				printf("bad note off message, note is too high\n");
 			if (vel >= 0x80)
-				printf("bad note off message, vel is too high\n");
-			printf("%% [%X] note off %02X %02X\n", msg & 0xF, note, vel);
+				printf("\nbad note off message, vel is too high\n");
+			//printf("%% [%X] note off %02X %02X\n", msg & 0xF, note, vel);
 		}
 		else if (msg >= 0x90 && msg < 0xA0){ // Note-On
 			if (pos + 1 >= chk.size){
-				printf("bad note on message, out of data\n");
+				printf("\nbad note on message, out of data\n");
 				return false;
 			}
+			running_status = msg;
 			int note = chk.data[pos++];
 			int vel = chk.data[pos++];
 			if (note >= 0x80)
-				printf("bad note on message, note is too high\n");
+				printf("\nbad note on message, note is too high\n");
 			if (vel >= 0x80)
-				printf("bad note on message, vel is too high\n");
-			printf("%% [%X] note on  %02X %02X\n", msg & 0xF, note, vel);
+				printf("\nbad note on message, vel is too high\n");
+			//printf("%% [%X] note on  %02X %02X\n", msg & 0xF, note, vel);
 		}
 		else if (msg >= 0xA0 && msg < 0xB0){ // Poly Key Pressure
 			if (pos + 1 >= chk.size){
 				printf("bad poly key message, out of data\n");
 				return false;
 			}
+			running_status = msg;
 			int p1 = chk.data[pos++];
 			int p2 = chk.data[pos++];
 			if (p1 >= 0x80)
-				printf("bad poly key message, p1 too high\n");
+				printf("\nbad poly key message, p1 too high\n");
 			if (p2 >= 0x80)
-				printf("bad poly key message, p2 too high\n");
-			printf("%% [%X] poly key %02X %02X\n", msg & 0xF, p1, p2);
+				printf("\nbad poly key message, p2 too high\n");
+			//printf("%% [%X] poly key %02X %02X\n", msg & 0xF, p1, p2);
 		}
 		else if (msg >= 0xB0 && msg < 0xC0){ // Control Change
 			if (pos + 1 >= chk.size){
 				printf("bad control message, out of data\n");
 				return false;
 			}
+			running_status = msg;
 			int p1 = chk.data[pos++];
 			int p2 = chk.data[pos++];
 			if (p1 >= 0x80)
-				printf("bad control message, p1 too high\n");
+				printf("\nbad control message, p1 too high\n");
 			if (p2 >= 0x80)
-				printf("bad control message, p2 too high\n");
-			printf("%% [%X] control  %02X %02X\n", msg & 0xF, p1, p2);
+				printf("\nbad control message, p2 too high\n");
+			//printf("%% [%X] control  %02X %02X\n", msg & 0xF, p1, p2);
 		}
 		else if (msg >= 0xC0 && msg < 0xD0){ // Program Change
 			if (pos >= chk.size){
-				printf("bad program message, out of data\n");
+				printf("\nbad program message, out of data\n");
 				return false;
 			}
+			running_status = msg;
 			int patch = chk.data[pos++];
 			if (patch >= 0x80)
-				printf("bad program message, patch is too high\n");
-			printf("%% [%X] program  %02X\n", msg & 0xF, patch);
+				printf("\n[%08X] bad program message, patch is too high %02X\n", pos, patch);
+			//printf("%% [%X] program  %02X\n", msg & 0xF, patch);
 		}
 		else if (msg >= 0xD0 && msg < 0xE0){ // Channel Pressure
 			if (pos >= chk.size){
-				printf("bad pressure message, out of data\n");
+				printf("\nbad pressure message, out of data\n");
 				return false;
 			}
+			running_status = msg;
 			int p = chk.data[pos++];
 			if (p >= 0x80)
-				printf("bad pressure message, p is too high\n");
-			printf("%% [%X] pressure %02X\n", msg & 0xF, p);
+				printf("\nbad pressure message, p is too high\n");
+			//printf("%% [%X] pressure %02X\n", msg & 0xF, p);
 		}
 		else if (msg >= 0xE0 && msg < 0xF0){ // Pitch Bend
 			if (pos + 1 >= chk.size){
-				printf("bad pitch b message, out of data\n");
+				printf("\nbad pitch b message, out of data\n");
 				return false;
 			}
+			running_status = msg;
 			int p1 = chk.data[pos++];
 			int p2 = chk.data[pos++];
 			if (p1 >= 0x80)
-				printf("bad pitch b message, p1 too high\n");
+				printf("\nbad pitch b message, p1 too high\n");
 			if (p2 >= 0x80)
-				printf("bad pitch b message, p2 too high\n");
-			printf("%% [%X] pitch b  %02X %02X\n", msg & 0xF, p1, p2);
+				printf("\nbad pitch b message, p2 too high\n");
+			//printf("%% [%X] pitch b  %02X %02X\n", msg & 0xF, p1, p2);
+		}
+		else if (msg == 0xF0 || msg == 0xF7){ // SysEx Event
+			// read length as a variable int
+			if (pos >= chk.size){
+				printf("\nbad sysex data length\n");
+				return false;
+			}
+			int dl = 0;
+			int len = 0;
+			while (true){
+				len++;
+				int t = chk.data[pos++];
+				if (t & 0x80){
+					if (pos >= chk.size){
+						printf("\nbad sysex data length\n");
+						return false;
+					}
+					dl = (dl << 7) | (t & 0x7F);
+				}
+				else{
+					dl = (dl << 7) | t;
+					break;
+				}
+			}
+			if (len > 4){
+				printf("\nbad sysex data length\n");
+				return false;
+			}
+			if (pos + dl > chk.size){
+				printf("\nbad sysex data length, len too large\n");
+				return false;
+			}
+			pos += dl;
+		}
+		else if (msg == 0xFF){ // Meta Event
+			if (pos + 1 >= chk.size){
+				printf("\nbad meta event, out of data\n");
+				return false;
+			}
+			int type = chk.data[pos++];
+			int len = chk.data[pos++];
+			if (pos + len > chk.size){
+				printf("\nbad meta event, len too large\n");
+				return false;
+			}
+			switch (type){
+				case 0x00: // 02 SSSS           Sequence Number
+				case 0x01: // LL text           Generic Text
+				case 0x02: // LL text           Copyright Notice
+				case 0x03: // LL text           Track Name
+				case 0x04: // LL text           Instrument Name
+				case 0x05: // LL text           Lyric
+				case 0x06: // LL text           Marker
+				case 0x07: // LL text           Cue Point
+				case 0x20: // 01 NN             Channel Prefix
+				case 0x21: // 01 PP             MIDI Port
+					break;
+				case 0x2F: // 00                End of Track
+					if (pos < chk.size)
+						printf("\nextra data at end of track: %d bytes\n", chk.size - pos);
+					return true;
+				case 0x51: // 03 TT TT TT       Set Tempo
+				case 0x54: // 05 HH MM SS RR TT SMPTE Offset
+				case 0x58: // 04 NN MM LL TT    Time Signature
+				case 0x59: // 02 SS MM          Key Signature
+				case 0x7F: // LL data           Sequencer-Specific Meta Event
+					//printf("%% meta %02X\n", type);
+					break;
+				default:
+					printf("\nunknown meta event %02X: %s\n", type, curfile);
+					break;
+			}
+			pos += len;
 		}
 		else
-			printf("unknown message: %02X\n", msg);
+			printf("\nunknown message %02X: %s\n", msg, curfile);
 	}
+	//printf("*\n");
 	return true;
 }
 
@@ -359,6 +452,7 @@ void process_midi(const char *file){
 	}
 
 	curfile = &file[32];
+	printf("%s\n", curfile);
 
 	fseek(fp, 0L, SEEK_END);
 	long filesize = ftell(fp);
@@ -405,7 +499,11 @@ void process_midi(const char *file){
 		}
 		else if (chk.type == 0x4D54726B){
 			mtrk_chunks++;
-			process_midi_mtrk(chk);
+			if (!process_midi_mtrk(chk)){
+				printf("file failed: %s\n", curfile);
+				exit(1);
+				return;
+			}
 		}
 		else
 			printf("Not processing chunk type %08X: %s\n", chk.type, curfile);
@@ -414,7 +512,11 @@ void process_midi(const char *file){
 	fclose(fp);
 }
 
-int main(){
+void midi_warn(const char *msg, void *user){
+	printf("> %s\n", msg);
+}
+
+int main(int argc, char **argv){
 	//SDL_Init(SDL_INIT_AUDIO);
 	//nm_test();
 	//SDL_Quit();
@@ -424,22 +526,17 @@ int main(){
 	//process_midi("/Users/sean/Downloads/midi/data/f/For_Those_About_To_Rock.MID");
 	//process_midi("/Users/sean/Downloads/midi/data/c/cantina13.mid");
 	//process_midi("/Users/sean/Downloads/midi/data/q/qfg4open.mid");
-	process_midi("/Users/sean/Downloads/midi/data/m/mario.mid");
+	//process_midi("/Users/sean/Downloads/midi/data/m/mario.mid");
+	//process_midi("/Users/sean/Downloads/midi/data/0/010Ratanakosin.mid");
+	//process_midi("/Users/sean/Downloads/midi/data/0/001.mid");
+	//process_midi("/Users/sean/Downloads/midi/data/0/00warcraft2.mid");
 
-	printf(
-		"-----------------------\n"
-		"MIDI Files       : %d\n"
-		"Total File Size  : %g GB\n"
-		"All chunks       : %d\n"
-		"Misaligned       : %d\n"
-		"Garbage end      : %d\n"
-		"MThd in middle   : %d\n",
-		all_files,
-		(double)total_size / (1024.0 * 1024.0 * 1024.0),
-		aligned_chunks + misaligned_chunks,
-		misaligned_chunks,
-		garbage_end,
-		mid_mthd);
+	// "/Users/sean/Downloads/midi/data/f/For_Those_About_To_Rock.MID"
+	//     has an 0-size MTrk which is followed by track data that goes until EOF
+
+	nm_midi midi = nm_midi_newfile("/Users/sean/Downloads/midi/data/c/cantina13.mid",
+		midi_warn, NULL);
+	nm_midi_free(midi);
 
 	return 0;
 }
