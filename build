@@ -165,8 +165,14 @@ sdl_src video/dummy/SDL_nullvideo.c
 # compile the source files
 # -fwrapv   integers should wrap around like normal
 # -Werror   elevate warnings to errors
+DEBUG_FLAG=
+if [ "$1" = "debug" ]; then
+	echo Debug Build
+	DEBUG_FLAG=-g
+fi
 clang                                      \
 	-o "$TGT_DIR/nightmare"                \
+	$DEBUG_FLAG                            \
 	-fwrapv                                \
 	-Werror                                \
 	-I"$SRC_DIR/demo/sdl-$SDL_VER/include" \

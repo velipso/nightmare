@@ -37,13 +37,16 @@ nm_midi nm_midi_newfile(const char *file, nm_midi_warn_func f_warn, void *warnus
 	if (data == NULL){
 		if (f_warn)
 			f_warn("Out of memory", warnuser);
+		fclose(fp);
 		return NULL;
 	}
 	if (fread(data, 1, size, fp) != size){
 		warn(f_warn, warnuser, "Failed to read contents of file: %s", file);
 		nm_free(data);
+		fclose(fp);
 		return NULL;
 	}
+	fclose(fp);
 	nm_midi midi = nm_midi_newbuffer(size, data, f_warn, warnuser);
 	nm_free(data);
 	return midi;
@@ -274,8 +277,8 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 							goto mtrk_end;
 						}
 						running_status = msg;
-						int note = data[pos++];
-						int vel = data[pos++];
+						int note = data[p++];
+						int vel = data[p++];
 						if (note >= 0x80){
 							warn(f_warn, warnuser, "Bad Note-Off message (invalid note %02X) in "
 								"track %d", note, actual_track_chunks);
@@ -295,8 +298,8 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 							goto mtrk_end;
 						}
 						running_status = msg;
-						int note = data[pos++];
-						int vel = data[pos++];
+						int note = data[p++];
+						int vel = data[p++];
 						if (note >= 0x80){
 							warn(f_warn, warnuser, "Bad Note-On message (invalid note %02X) in "
 								"track %d", note, actual_track_chunks);
@@ -316,8 +319,8 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 							goto mtrk_end;
 						}
 						running_status = msg;
-						int note = data[pos++];
-						int pressure = data[pos++];
+						int note = data[p++];
+						int pressure = data[p++];
 						if (note >= 0x80){
 							warn(f_warn, warnuser, "Bad Note Pressure message (invalid note %02X) "
 								"in track %d", note, actual_track_chunks);
@@ -337,8 +340,8 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 							goto mtrk_end;
 						}
 						running_status = msg;
-						int ctrl = data[pos++];
-						int val = data[pos++];
+						int ctrl = data[p++];
+						int val = data[p++];
 						if (ctrl >= 0x80){
 							warn(f_warn, warnuser, "Bad Control Change message (invalid control "
 								" %02X) in track %d", ctrl, actual_track_chunks);
@@ -510,4 +513,5 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 }
 
 void nm_midi_free(nm_midi midi){
+	nm_free(midi);
 }
