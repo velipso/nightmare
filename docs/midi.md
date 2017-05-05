@@ -330,5 +330,5 @@ change the size of a quarter-note, but that doesn't matter because the ticks per
 cancels out the quarter notes.
 
 However, if a Time Signature Meta Event comes *before* a Set Tempo event, then that will change the
-quarter-notes per beat, which means we'll use the 120 beats per minute default tempo to figure out
-the *ticks per second*: Division * 2 * 2<sup>2 - `MM`</sup>
+quarter-notes per beat, which means we'll use the 120 beats per minute default tempo (2 beats per
+second) to figure out the *ticks per second*: Division * 2 * 2<sup>2 - `MM`</sup>
