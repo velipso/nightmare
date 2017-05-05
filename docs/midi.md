@@ -312,7 +312,7 @@ If Time Signature is not set, the denominator defaults to 4, which represents 1 
 beat.
 
 The MIDI specification also talks about another unit, the *MIDI clock*, which is simply
-<sup>1</sup>/<sub>24</sub>th the length of a quarter-note.
+<sup>1</sup>/<sub>24th</sub> the length of a quarter-note.
 
 So with all this information, we can calculate the *ticks per second*:
 
