@@ -304,15 +304,15 @@ way:
 | `00` | 1                          | 4                      |
 | `01` | 2                          | 2                      |
 | `02` | 4                          | 1                      |
-| `03` | 8                          | 1/2                    |
-| `04` | 16                         | 1/4                    |
+| `03` | 8                          | <sup>1</sup>/<sub>2</sub> |
+| `04` | 16                         | <sup>1</sup>/<sub>4</sub> |
 | `MM` | 2<sup>`MM`</sup>           | 2<sup>2 - `MM`</sup>   |
 
 If Time Signature is not set, the denominator defaults to 4, which represents 1 quarter-note per
 beat.
 
-The MIDI specification also talks about another unit, the *MIDI clock*, which is simply 1/24th the
-length of a quarter-note.
+The MIDI specification also talks about another unit, the *MIDI clock*, which is simply
+<sup>1</sup>/<sub>24</sub>th the length of a quarter-note.
 
 So with all this information, we can calculate the *ticks per second*:
 
