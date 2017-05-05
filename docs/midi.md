@@ -123,7 +123,7 @@ to ignore the field.
 
 According to the specification, the division can come in two formats:
 
-1. If bit 15 is cleared, then bits 14-0 represent the ticks per quarter note
+1. If bit 15 is cleared, then bits 14-0 represent the ticks per quarter-note
 2. If bit 15 is set, then bits 14-8 represent the negative SMPTE format, and bits 7-0 represent the
    ticks per frame
 
@@ -327,7 +327,7 @@ If we receive a Set Tempo event (`TTTTTT` *microseconds per quarter-note*), we c
 
 If a Time Signature Meta Event comes after a Set Tempo event, it can safely be ignored -- it will
 change the size of a quarter-note, but that doesn't matter because the ticks per second calculation
-cancels out the quarter notes.
+cancels out the quarter-notes.
 
 However, if a Time Signature Meta Event comes *before* a Set Tempo event, then that will change the
 quarter-notes per beat, which means we'll use the 120 beats per minute default tempo (2 beats per
