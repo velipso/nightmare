@@ -86,18 +86,15 @@ static bool read_chunk(uint64_t p, uint64_t size, uint8_t *data, chunk_st *chk){
 	int type = chunk_type(data[p + 0], data[p + 1], data[p + 2], data[p + 3]);
 	int alignment = 0;
 	if (type < 0){
-		// search around for the chunk
-		// chop off any repeated bytes
 		uint64_t p_orig = p;
-		while (data[p] == data[p + 1] && data[p] == data[p + 2] && data[p] == data[p + 3]){
-			p += 4;
-			if (p + 4 > size)
-				return false;
-		}
-		// rewind 7 bytes and search forward 32 bytes
+		// rewind 7 bytes and search forward until end of data
 		p = p < 7 ? 0 : p - 7;
-		for (int i = 0; i < 28 && p + 4 <= size && type < 0; i++, p++)
+		while (p + 4 <= size){
 			type = chunk_type(data[p + 0], data[p + 1], data[p + 2], data[p + 3]);
+			if (type >= 0)
+				break;
+			p++;
+		}
 		if (type >= 0)
 			alignment = (int)(p - p_orig);
 	}
@@ -112,6 +109,37 @@ static bool read_chunk(uint64_t p, uint64_t size, uint8_t *data, chunk_st *chk){
 	chk->data_start = p + 8;
 	chk->alignment = alignment;
 	return true;
+}
+
+static inline void fire_noteoff(nm_midi midi, uint64_t tick, int track, uint8_t chan,
+	uint8_t note, uint8_t vel){
+}
+
+static inline void fire_noteon(nm_midi midi, uint64_t tick, int track, uint8_t chan,
+	uint8_t note, uint8_t vel){
+}
+
+static inline void fire_notepres(nm_midi midi, uint64_t tick, int track, uint8_t chan,
+	uint8_t note, uint8_t pres){
+}
+
+static inline void fire_ctrlchg(nm_midi midi, uint64_t tick, int track, uint8_t chan,
+	uint8_t ctrl, uint8_t val){
+}
+
+static inline void fire_prgchg(nm_midi midi, uint64_t tick, int track, uint8_t chan,
+	uint8_t patch){
+}
+
+static inline void fire_chanpres(nm_midi midi, uint64_t tick, int track, uint8_t chan,
+	uint8_t pres){
+}
+
+static inline void fire_pitchbend(nm_midi midi, uint64_t tick, int track, uint8_t chan,
+	uint16_t bend){
+}
+
+static inline void fire_settempo(nm_midi midi, uint64_t tick, int track, int tempo){
 }
 
 nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn, void *warnuser){
@@ -137,8 +165,11 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 		if (!read_chunk(pos, size, data, &chk)){
 			if (midi == NULL)
 				warn(f_warn, warnuser, "Invalid header");
-			else
-				warn(f_warn, warnuser, "Unrecognized data at end of file");
+			else{
+				uint64_t dif = size - pos;
+				warn(f_warn, warnuser, "Unrecognized data (%llu byte%s) at end of file", dif,
+					dif == 1 ? "" : "s");
+			}
 			return midi;
 		}
 		if (chk.alignment != 0){
@@ -208,21 +239,19 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 			} break;
 
 			case 1: { // MTrk
-				actual_track_chunks++;
-				if (format == 0 && actual_track_chunks > 1){
+				if (format == 0 && actual_track_chunks > 0){
 					warn(f_warn, warnuser, "Format 0 expecting 1 track chunk, found more than one");
 					format = 1;
 				}
-				if (actual_track_chunks == 1 || format == 2){
+				if (actual_track_chunks == 0 || format == 2){
 					tempo = 120;
 					timesig_num = 4;
 					timesig_den = 4;
 				}
 				running_status = -1;
-
-
 				uint64_t p = chk.data_start;
 				uint64_t p_end = chk.data_start + chk.data_size;
+				uint64_t tick = 0;
 				while (p < p_end){
 					// read delta as variable int
 					int dt = 0;
@@ -248,6 +277,8 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 							break;
 						}
 					}
+
+					tick += dt;
 
 					if (p >= p_end){
 						warn(f_warn, warnuser, "Missing message in track %d", actual_track_chunks);
@@ -277,8 +308,8 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 							goto mtrk_end;
 						}
 						running_status = msg;
-						int note = data[p++];
-						int vel = data[p++];
+						uint8_t note = data[p++];
+						uint8_t vel = data[p++];
 						if (note >= 0x80){
 							warn(f_warn, warnuser, "Bad Note-Off message (invalid note %02X) in "
 								"track %d", note, actual_track_chunks);
@@ -289,7 +320,7 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 								"in track %d", vel, actual_track_chunks);
 							vel ^= 0x80;
 						}
-						// TODO: fire('note off', dt, msg & 0xF, note, vel)
+						fire_noteoff(midi, tick, actual_track_chunks, msg & 0xF, note, vel);
 					}
 					else if (msg >= 0x90 && msg < 0xA0){ // Note-On
 						if (p + 1 >= p_end){
@@ -298,8 +329,8 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 							goto mtrk_end;
 						}
 						running_status = msg;
-						int note = data[p++];
-						int vel = data[p++];
+						uint8_t note = data[p++];
+						uint8_t vel = data[p++];
 						if (note >= 0x80){
 							warn(f_warn, warnuser, "Bad Note-On message (invalid note %02X) in "
 								"track %d", note, actual_track_chunks);
@@ -310,7 +341,7 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 								"in track %d", vel, actual_track_chunks);
 							vel ^= 0x80;
 						}
-						// TODO: fire('note on', dt, msg & 0xF, note, vel)
+						fire_noteon(midi, tick, actual_track_chunks, msg & 0xF, note, vel);
 					}
 					else if (msg >= 0xA0 && msg < 0xB0){ // Note Pressure
 						if (p + 1 >= p_end){
@@ -319,8 +350,8 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 							goto mtrk_end;
 						}
 						running_status = msg;
-						int note = data[p++];
-						int pressure = data[p++];
+						uint8_t note = data[p++];
+						uint8_t pressure = data[p++];
 						if (note >= 0x80){
 							warn(f_warn, warnuser, "Bad Note Pressure message (invalid note %02X) "
 								"in track %d", note, actual_track_chunks);
@@ -331,7 +362,7 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 								"%02X) in track %d", pressure, actual_track_chunks);
 							pressure ^= 0x80;
 						}
-						// TODO: fire('note pressure', dt, msg & 0xF, note, pressure)
+						fire_notepres(midi, tick, actual_track_chunks, msg & 0xF, note, pressure);
 					}
 					else if (msg >= 0xB0 && msg < 0xC0){ // Control Change
 						if (p + 1 >= p_end){
@@ -340,8 +371,8 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 							goto mtrk_end;
 						}
 						running_status = msg;
-						int ctrl = data[p++];
-						int val = data[p++];
+						uint8_t ctrl = data[p++];
+						uint8_t val = data[p++];
 						if (ctrl >= 0x80){
 							warn(f_warn, warnuser, "Bad Control Change message (invalid control "
 								" %02X) in track %d", ctrl, actual_track_chunks);
@@ -352,8 +383,7 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 								"in track %d", val, actual_track_chunks);
 							val ^= 0x80;
 						}
-						// TODO: further validate ctrl->val relationship based on ctrl
-						// TODO: fire('control change', dt, msg & 0xF, ctrl, val)
+						fire_ctrlchg(midi, tick, actual_track_chunks, msg & 0xF, ctrl, val);
 					}
 					else if (msg >= 0xC0 && msg < 0xD0){ // Program Change
 						if (p >= p_end){
@@ -362,13 +392,13 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 							goto mtrk_end;
 						}
 						running_status = msg;
-						int patch = data[p++];
+						uint8_t patch = data[p++];
 						if (patch >= 0x80){
 							warn(f_warn, warnuser, "Bad Program Change message (invalid patch "
 								"%02X) in track %d", patch, actual_track_chunks);
 							patch ^= 0x80;
 						}
-						// TODO: fire('program change', dt, msg & 0xF, patch)
+						fire_prgchg(midi, tick, actual_track_chunks, msg & 0xF, patch);
 					}
 					else if (msg >= 0xD0 && msg < 0xE0){ // Channel Pressure
 						if (p >= p_end){
@@ -377,13 +407,13 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 							goto mtrk_end;
 						}
 						running_status = msg;
-						int pressure = data[p++];
+						uint8_t pressure = data[p++];
 						if (pressure >= 0x80){
 							warn(f_warn, warnuser, "Bad Channel Pressure message (invalid pressure "
 								"%02X) in track %d", pressure, actual_track_chunks);
 							pressure ^= 0x80;
 						}
-						// TODO: fire('channel pressure', dt, msg & 0xF, pressure)
+						fire_chanpres(midi, tick, actual_track_chunks, msg & 0xF, pressure);
 					}
 					else if (msg >= 0xE0 && msg < 0xF0){ // Pitch Bend
 						if (p + 1 >= p_end){
@@ -404,7 +434,7 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 								"%02X) in track %d", p2, actual_track_chunks);
 							p2 ^= 0x80;
 						}
-						// TODO: fire('pitch bend', dt, msg & 0xF, p1 | (p2 << 7))
+						fire_pitchbend(midi, tick, actual_track_chunks, msg & 0xF, p1 | (p2 << 7));
 					}
 					else if (msg == 0xF0 || msg == 0xF7){ // SysEx Event
 						running_status = -1; // TODO: validate we should clear this
@@ -464,8 +494,13 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 							case 0x07: // LL text           Cue Point
 							case 0x20: // 01 NN             Channel Prefix
 							case 0x21: // 01 PP             MIDI Port
+							case 0x2E: // ?????             "Track Loop Event"?
 								break;
 							case 0x2F: // 00                End of Track
+								if (len != 0){
+									warn(f_warn, warnuser, "Expecting zero-length data for End of "
+										"Track message for track %d", actual_track_chunks);
+								}
 								if (p < p_end){
 									uint64_t pd = p_end - p;
 									warn(f_warn, warnuser, "Extra data at end of track %d: %llu "
@@ -473,11 +508,25 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 								}
 								goto mtrk_end;
 							case 0x51: // 03 TT TT TT       Set Tempo
+								if (len < 3){
+									warn(f_warn, warnuser, "Missing data for Set Tempo event in "
+										"track %d", actual_track_chunks);
+								}
+								else{
+									if (len > 3){
+										warn(f_warn, warnuser, "Extra %d byte%s for Set Tempo "
+											"event in track %d", len - 3, len - 3 == 1 ? "" : "s",
+											actual_track_chunks);
+									}
+									fire_settempo(midi, tick, actual_track_count,
+										((int)data[p + 0] << 16) | ((int)data[p + 1] << 8) |
+										data[p + 2]);
+								}
+								break;
 							case 0x54: // 05 HH MM SS RR TT SMPTE Offset
 							case 0x58: // 04 NN MM LL TT    Time Signature
 							case 0x59: // 02 SS MM          Key Signature
 							case 0x7F: // LL data           Sequencer-Specific Meta Event
-								//printf("%% meta %02X\n", type);
 								break;
 							default:
 								warn(f_warn, warnuser, "Unknown Meta Event %02X in track %d",
@@ -492,15 +541,18 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 						goto mtrk_end;
 					}
 				}
-				mtrk_end:;
+				warn(f_warn, warnuser, "Track %d ended before receiving End of Track message",
+					actual_track_chunks);
+				mtrk_end:
+				actual_track_chunks++;
 			} break;
 
 			case 2: { // XFIH
-				printf("TODO: XFIH\n");
+				warn(f_warn, warnuser, "TODO: XFIH chunk not implemented");
 			} break;
 
 			case 3: { // XFKM
-				printf("TODO: XFKM\n");
+				warn(f_warn, warnuser, "TODO: XFKM chunk not implemented");
 			} break;
 
 			default:
@@ -508,6 +560,10 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 				exit(1);
 				return NULL;
 		}
+	}
+	if (found_header && track_chunks != actual_track_chunks){
+		warn(f_warn, warnuser, "Mismatch between reported track count (%d) and actual track "
+			"count (%d)", track_chunks, actual_track_chunks);
 	}
 	return midi;
 }

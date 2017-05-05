@@ -63,10 +63,10 @@ seen `'XFIH'` and `'XFKM'` chunks, which after searching online, shows they are 
 Yamaha for karaoke.
 
 Chunks *should* be immediately one after another, and most files follow that rule -- however, a few
-files have junk data between chunks (for example, a string of repeated bytes like `00 00 00 ...`).
-A robust decoder might want to search the area around the end of a chunk for the next chunk,
-skipping over repeated byte data, including searching backwards in case the previous chunk reported
-a Data Size too large.
+files have junk data between chunks (for example, a string of repeated bytes like `00 00 00 ...`),
+or data that *looks* useful, but I can't figure out how to decode it.  The best strategy is probably
+to start searching 7 bytes backwards (in case the previous track reported too large a Data Size),
+and search forward looking for known Chunk Types until the end of the file.
 
 The chunk stream starts with `'MThd'`, and *should* only contain `'MThd'` once.  In practice, all
 MIDI files I've seen start with `'MThd'`, but some also have `'MThd'` chunks in the middle of the
@@ -131,8 +131,8 @@ In practice, no files have bit 15 set (other than `ffmqbatl.mid` which has it se
 header).  If someone can find me some test MIDI files that use SMPTE timing, then I would love to
 look into it.  Otherwise, I will just reject files that have bit 15 set.
 
-All MIDI files should specify the time signature and tempo as events inside the `'MTrk'` chunk.  If
-they don't, the default values are 4/4 time signature, and 120 beats per minute.
+Figuring out the timing of the events is, unfortunately, not straight forward.  There is an entire
+section on calculating timing below.
 
 ### `'MThd'` Statistics
 
@@ -206,12 +206,12 @@ Examples:
 
 Channel Messages start with a single byte in the range `80` to `EF`.  The lower 4 bits represent
 the channel `n` (0-15 are usually displayed as 1-16), and the higher 4 bits represent the message
-type.  For example, `94` is a Note-On message for channel 5.
+type.  For example, `94` is a Note On message for channel 5.
 
 | Message | Parameter 1             | Parameter 2                     | Description               |
 |---------|-------------------------|---------------------------------|---------------------------|
-| `8n`    | Note (`00` to `7F`)     | Release Velocity (`00` to `7F`) | Note-Off                  |
-| `9n`    | Note (`00` to `7F`)     | Hit Velocity (`00` to `7F`)     | Note-On                   |
+| `8n`    | Note (`00` to `7F`)     | Release Velocity (`00` to `7F`) | Note Off                  |
+| `9n`    | Note (`00` to `7F`)     | Hit Velocity (`00` to `7F`)     | Note On                   |
 | `An`    | Note (`00` to `7F`)     | Pressure (`00` to `7F`)         | Note Pressure             |
 | `Bn`    | Control (`00` to `7F`)  | Value (`00` to `7F`)            | Control Change            |
 | `Cn`    | Patch (`00` to `7F`)    | N/A                             | Program Change            |
@@ -266,16 +266,13 @@ Any parameters spanning multiple bytes should be interpreted as big endian.
 | `FF 07 LL text`     | Cue Point of length `LL` ('curtain opens', 'character is slapped', etc)   |
 | `FF 20 01 NN`       | Channel Prefix, select channel `NN` (0-15) for future SysEx/Meta events   |
 | `FF 21 01 PP`       | MIDI Port, select output port `PP` for MIDI events                        |
+| `FF 2E ?? ????`     | Track Loop Event (?)                                                      |
 | `FF 2F 00`          | End of Track, required as last event in a MTrk chunk                      |
 | `FF 51 03 TT TT TT` | Set Tempo, in `TTTTTT` microseconds per MIDI quarter-note                 |
 | `FF 54 05 HH MM SS RR TT` | SMPTE Offset, hour, minute, second, frame, 1/100th of frame         |
 | `FF 58 04 NN MM LL TT` | Time Signature, see below for details                                  |
 | `FF 59 02 SS MM`    | Key Signature, see below for details                                      |
 | `FF 7F LL data`     | Sequencer-Specific Meta Event, see below for details                      |
-
-#### Time Signature Meta Event
-
-TODO
 
 #### Key Signature Meta Event
 
@@ -284,3 +281,27 @@ TODO
 #### Sequencer-Specific Meta Event
 
 TODO
+
+### Calculating Timing
+
+The MIDI specification has a lot of ways to represent timing.
+
+The unit of the Division parameter in the header is *ticks per quarter-note*.
+
+The unit of the Delta Timestamps is *ticks* passed since previous event.
+
+The unit of the Set Tempo Meta Event is *microseconds per quarter-note*.
+
+If Set Tempo is not set, then the default value is 120 *beats per minute*.
+
+The Time Signature Meta Event's denominator (`MM`) represents *quarter-notes per beat* in a goofy
+way:
+
+| `MM` | Time Signature Denominator | Quarter-Notes per Beat |
+|------|----------------------------|------------------------|
+| `00` | 1                          | 4                      |
+| `01` | 2                          | 2                      |
+| `02` | 4                          | 1                      |
+| `03` | 8                          | 1/2                    |
+| `04` | 16                         | 1/4                    |
+| `MM` | 2<sup>`MM`</sup>           | 2<sup>2 - `MM`</sup>   |

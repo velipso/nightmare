@@ -68,14 +68,22 @@ void each_midi(const char *file){
 		process_midi(file);
 }
 
+bool did_warn;
 void midi_warn(const char *msg, void *user){
+	did_warn = true;
 	printf("> %s\n", msg);
 }
 
+int tot_warn = 0;
+int tot_all = 0;
 void process_midi(const char *file){
+	did_warn = false;
 	printf("%s\n", &file[32]);
 	nm_midi midi = nm_midi_newfile(file, midi_warn, NULL);
 	nm_midi_free(midi);
+	tot_all++;
+	if (did_warn)
+		tot_warn++;
 }
 
 int main(int argc, char **argv){
@@ -94,6 +102,9 @@ int main(int argc, char **argv){
 
 	// "/Users/sean/Downloads/midi/data/f/For_Those_About_To_Rock.MID"
 	//     has an 0-size MTrk which is followed by track data that goes until EOF
+
+	printf("warnings from %d / %d (%g)\n", tot_warn, tot_all,
+		(double)tot_warn * 100.0 / (double)tot_all);
 
 	return 0;
 }
