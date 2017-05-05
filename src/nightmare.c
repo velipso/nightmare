@@ -5,6 +5,7 @@
 #include "nightmare.h"
 #include <stdio.h>
 #include <stdarg.h>
+#include <math.h>
 
 nm_alloc_func nm_alloc = malloc;
 nm_free_func nm_free = free;
@@ -26,22 +27,17 @@ static void warn(nm_midi_warn_func f_warn, void *warnuser, const char *fmt, ...)
 
 nm_midi nm_midi_newfile(const char *file, nm_midi_warn_func f_warn, void *warnuser){
 	FILE *fp = fopen(file, "rb");
-	if (fp == NULL){
-		warn(f_warn, warnuser, "Failed to open file: %s", file);
+	if (fp == NULL)
 		return NULL;
-	}
 	fseek(fp, 0, SEEK_END);
 	uint64_t size = ftell(fp);
 	fseek(fp, 0, SEEK_SET);
 	uint8_t *data = nm_alloc(sizeof(uint8_t) * size);
 	if (data == NULL){
-		if (f_warn)
-			f_warn("Out of memory", warnuser);
 		fclose(fp);
 		return NULL;
 	}
 	if (fread(data, 1, size, fp) != size){
-		warn(f_warn, warnuser, "Failed to read contents of file: %s", file);
 		nm_free(data);
 		fclose(fp);
 		return NULL;
@@ -111,35 +107,111 @@ static bool read_chunk(uint64_t p, uint64_t size, uint8_t *data, chunk_st *chk){
 	return true;
 }
 
-static inline void fire_noteoff(nm_midi midi, uint64_t tick, int track, uint8_t chan,
-	uint8_t note, uint8_t vel){
+static inline nm_event ev_noteoff(uint64_t tick, int chan, uint8_t note, uint8_t vel){
+	nm_event ev = nm_alloc(sizeof(nm_event_st));
+	if (ev == NULL)
+		return NULL;
+	ev->next = NULL;
+	ev->type = NM_NOTEOFF;
+	ev->tick = tick;
+	ev->u.noteoff.channel = chan;
+	ev->u.noteoff.note = note;
+	if (vel == 0x40)
+		ev->u.noteoff.velocity = 0.5f;
+	else
+		ev->u.noteoff.velocity = (float)vel / 127.0f;
+	return ev;
 }
 
-static inline void fire_noteon(nm_midi midi, uint64_t tick, int track, uint8_t chan,
-	uint8_t note, uint8_t vel){
+static inline nm_event ev_noteon(uint64_t tick, int chan, uint8_t note, uint8_t vel){
+	if (vel == 0)
+		return ev_noteoff(tick, chan, note, 0x40);
+	nm_event ev = nm_alloc(sizeof(nm_event_st));
+	if (ev == NULL)
+		return NULL;
+	ev->next = NULL;
+	ev->type = NM_NOTEON;
+	ev->tick = tick;
+	ev->u.noteon.channel = chan;
+	ev->u.noteon.note = note;
+	if (vel == 0x40)
+		ev->u.noteon.velocity = 0.5f;
+	else
+		ev->u.noteon.velocity = (float)vel / 127.0f;
+	return ev;
 }
 
-static inline void fire_notepres(nm_midi midi, uint64_t tick, int track, uint8_t chan,
-	uint8_t note, uint8_t pres){
+static inline nm_event ev_notepressure(uint64_t tick, int chan, uint8_t note, uint8_t pres){
+	nm_event ev = nm_alloc(sizeof(nm_event_st));
+	if (ev == NULL)
+		return NULL;
+	ev->next = NULL;
+	ev->type = NM_NOTEPRESSURE;
+	ev->tick = tick;
+	ev->u.notepressure.channel = chan;
+	ev->u.notepressure.note = note;
+	ev->u.notepressure.pressure = pres;
+	return ev;
 }
 
-static inline void fire_ctrlchg(nm_midi midi, uint64_t tick, int track, uint8_t chan,
-	uint8_t ctrl, uint8_t val){
+static inline nm_event ev_controlchange(uint64_t tick, int chan, uint8_t ctrl, uint8_t val){
+	nm_event ev = nm_alloc(sizeof(nm_event_st));
+	if (ev == NULL)
+		return NULL;
+	ev->next = NULL;
+	ev->type = NM_CONTROLCHANGE;
+	ev->tick = tick;
+	ev->u.controlchange.channel = chan;
+	ev->u.controlchange.control = ctrl;
+	ev->u.controlchange.value = val;
+	return ev;
 }
 
-static inline void fire_prgchg(nm_midi midi, uint64_t tick, int track, uint8_t chan,
-	uint8_t patch){
+static inline nm_event ev_programchange(uint64_t tick, int chan, uint8_t patch){
+	nm_event ev = nm_alloc(sizeof(nm_event_st));
+	if (ev == NULL)
+		return NULL;
+	ev->next = NULL;
+	ev->type = NM_PROGRAMCHANGE;
+	ev->tick = tick;
+	ev->u.programchange.channel = channel;
+	ev->u.programchange.patch = patch;
+	return ev;
 }
 
-static inline void fire_chanpres(nm_midi midi, uint64_t tick, int track, uint8_t chan,
-	uint8_t pres){
+static inline nm_event ev_channelpressure(uint64_t tick, int chan, uint8_t pres){
+	nm_event ev = nm_alloc(sizeof(nm_event_st));
+	if (ev == NULL)
+		return NULL;
+	ev->next = NULL;
+	ev->type = NM_CHANNELPRESSURE;
+	ev->tick = tick;
+	ev->u.channelpressure.channel = chan;
+	ev->u.channelpressure.pressure = pres;
+	return ev;
 }
 
-static inline void fire_pitchbend(nm_midi midi, uint64_t tick, int track, uint8_t chan,
-	uint16_t bend){
+static inline nm_event ev_pitchbend(uint64_t tick, int chan, uint16_t bend){
+	nm_event ev = nm_alloc(sizeof(nm_event_st));
+	if (ev == NULL)
+		return NULL;
+	ev->next = NULL;
+	ev->type = NM_PITCHBEND;
+	ev->tick = tick;
+	ev->u.pitchbend.channel = chan;
+	ev->u.pitchbend.bend = bend;
+	return ev;
 }
 
-static inline void fire_settempo(nm_midi midi, uint64_t tick, int track, int tempo){
+static inline nm_event ev_tempo(uint64_t tick, int tempo){
+	nm_event ev = nm_alloc(sizeof(nm_event_st));
+	if (ev == NULL)
+		return NULL;
+	ev->next = NULL;
+	ev->type = NM_TEMPO;
+	ev->tick = tick;
+	ev->u.tempo.tempo = tempo;
+	return ev;
 }
 
 nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn, void *warnuser){
@@ -518,7 +590,7 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 											"event in track %d", len - 3, len - 3 == 1 ? "" : "s",
 											actual_track_chunks);
 									}
-									fire_settempo(midi, tick, actual_track_count,
+									fire_settempo(midi, tick, actual_track_chunks,
 										((int)data[p + 0] << 16) | ((int)data[p + 1] << 8) |
 										data[p + 2]);
 								}
@@ -566,6 +638,42 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 			"count (%d)", track_chunks, actual_track_chunks);
 	}
 	return midi;
+}
+
+nm_ctx nm_ctx_new(nm_midi midi, int samples_per_sec){
+	nm_ctx ctx = nm_alloc(sizeof(nm_ctx_st));
+	if (ctx == NULL)
+		return NULL;
+	ctx->midi = midi;
+	ctx->ticks = 0;
+	ctx->ticks_per_sec = 0;
+	ctx->samples_per_sec = samples_per_sec;
+	ctx->ignore_timesig = false;
+	ctx->notes = nm_alloc(sizeof(nm_note_st) * 128 * midi->max_channels);
+	if (ctx->notes == NULL){
+		nm_free(ctx);
+		return NULL;
+	}
+	for (int ch = 0, i = 0; ch < midi->max_channels; ch++){
+		for (int nt = 0; nt < 128; nt++, i++){
+			ctx->notes[i].note = nt;
+			ctx->notes[i].freq = 440.0 * pow(2.0, (nt - 69.0) / 12.0);
+			ctx->notes[i].hit_velocity = 1;
+			ctx->notes[i].hold_pressure = 1;
+			ctx->notes[i].pitch_bend = 0;
+			ctx->notes[i].release_velocity = 1;
+			ctx->notes[i].pressed = false;
+		}
+	}
+	return ctx;
+}
+
+int nm_ctx_process(nm_ctx ctx, int sample_len, nm_sample_st *samples){
+}
+
+void nm_ctx_free(nm_ctx ctx){
+	nm_free(ctx->notes);
+	nm_free(ctx);
 }
 
 void nm_midi_free(nm_midi midi){
