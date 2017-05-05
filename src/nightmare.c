@@ -354,7 +354,6 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 				uint64_t p = chk.data_start;
 				uint64_t p_end = chk.data_start + chk.data_size;
 				uint64_t tick = 0;
-				nm_event ev_first = NULL;
 				nm_event ev_last = NULL;
 				while (p < p_end){
 					// read delta as variable int
@@ -661,15 +660,10 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 						goto mtrk_end;
 					}
 					if (ev_new){
-						if (ev_first == NULL){
-							ev_first = ev_new;
-							ev_last = ev_new;
-							midi->tracks[track_i] = ev_first;
-						}
-						else{
-							ev_last->next = ev_new;
-							ev_last = ev_new;
-						}
+						if (ev_last == NULL)
+							midi->tracks[track_i] = ev_last = ev_new;
+						else
+							ev_last = (ev_last->next = ev_new);
 					}
 				}
 				warn(f_warn, warnuser, "Track %d ended before receiving End of Track message",
