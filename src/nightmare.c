@@ -8,6 +8,7 @@
 #include <math.h>
 
 nm_alloc_func nm_alloc = malloc;
+nm_realloc_func nm_realloc = realloc;
 nm_free_func nm_free = free;
 
 static void warn(nm_midi_warn_func f_warn, void *warnuser, const char *fmt, ...){
@@ -150,7 +151,7 @@ static inline nm_event ev_notepressure(uint64_t tick, int chan, uint8_t note, ui
 	ev->tick = tick;
 	ev->u.notepressure.channel = chan;
 	ev->u.notepressure.note = note;
-	ev->u.notepressure.pressure = pres;
+	ev->u.notepressure.pressure = (float)pres / 127.0f; // TODO: not sure
 	return ev;
 }
 
@@ -174,7 +175,7 @@ static inline nm_event ev_programchange(uint64_t tick, int chan, uint8_t patch){
 	ev->next = NULL;
 	ev->type = NM_PROGRAMCHANGE;
 	ev->tick = tick;
-	ev->u.programchange.channel = channel;
+	ev->u.programchange.channel = chan;
 	ev->u.programchange.patch = patch;
 	return ev;
 }
@@ -187,7 +188,7 @@ static inline nm_event ev_channelpressure(uint64_t tick, int chan, uint8_t pres)
 	ev->type = NM_CHANNELPRESSURE;
 	ev->tick = tick;
 	ev->u.channelpressure.channel = chan;
-	ev->u.channelpressure.pressure = pres;
+	ev->u.channelpressure.pressure = (float)pres / 127.0f;
 	return ev;
 }
 
@@ -199,7 +200,12 @@ static inline nm_event ev_pitchbend(uint64_t tick, int chan, uint16_t bend){
 	ev->type = NM_PITCHBEND;
 	ev->tick = tick;
 	ev->u.pitchbend.channel = chan;
-	ev->u.pitchbend.bend = bend;
+	if (bend < 0x2000)
+		ev->u.pitchbend.bend = (float)(bend - 0x2000) / 8192.0f;
+	else if (bend == 0x2000)
+		ev->u.pitchbend.bend = 0;
+	else
+		ev->u.pitchbend.bend = (float)(bend - 0x2000) / 8191.0f;
 	return ev;
 }
 
@@ -211,6 +217,20 @@ static inline nm_event ev_tempo(uint64_t tick, int tempo){
 	ev->type = NM_TEMPO;
 	ev->tick = tick;
 	ev->u.tempo.tempo = tempo;
+	return ev;
+}
+
+static inline nm_event ev_timesig(uint64_t tick, int num, int den, int cc, int dd){
+	nm_event ev = nm_alloc(sizeof(nm_event_st));
+	if (ev == NULL)
+		return NULL;
+	ev->next = NULL;
+	ev->type = NM_TIMESIG;
+	ev->tick = tick;
+	ev->u.timesig.num = num;
+	ev->u.timesig.den = den;
+	ev->u.timesig.cc = cc;
+	ev->u.timesig.dd = dd;
 	return ev;
 }
 
@@ -250,11 +270,12 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 		}
 		if (midi == NULL){
 			midi = nm_alloc(sizeof(nm_midi_st));
-			if (midi == NULL){
-				if (f_warn)
-					f_warn("Out of memory", warnuser);
+			if (midi == NULL)
 				return NULL;
-			}
+			midi->tracks = NULL;
+			midi->track_count = 0;
+			midi->ticks_per_q = 0;
+			midi->max_channels = 0;
 		}
 		uint64_t orig_size = chk.data_size;
 		if (chk.data_start + chk.data_size > size){
@@ -324,8 +345,11 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 				uint64_t p = chk.data_start;
 				uint64_t p_end = chk.data_start + chk.data_size;
 				uint64_t tick = 0;
+				nm_event ev_first = NULL;
+				nm_event ev_last = NULL;
 				while (p < p_end){
 					// read delta as variable int
+					nm_event ev_new = NULL;
 					int dt = 0;
 					int len = 0;
 					while (true){
@@ -392,7 +416,7 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 								"in track %d", vel, actual_track_chunks);
 							vel ^= 0x80;
 						}
-						fire_noteoff(midi, tick, actual_track_chunks, msg & 0xF, note, vel);
+						ev_new = ev_noteoff(tick, msg & 0xF, note, vel);
 					}
 					else if (msg >= 0x90 && msg < 0xA0){ // Note-On
 						if (p + 1 >= p_end){
@@ -413,7 +437,7 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 								"in track %d", vel, actual_track_chunks);
 							vel ^= 0x80;
 						}
-						fire_noteon(midi, tick, actual_track_chunks, msg & 0xF, note, vel);
+						ev_new = ev_noteon(tick, msg & 0xF, note, vel);
 					}
 					else if (msg >= 0xA0 && msg < 0xB0){ // Note Pressure
 						if (p + 1 >= p_end){
@@ -434,7 +458,7 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 								"%02X) in track %d", pressure, actual_track_chunks);
 							pressure ^= 0x80;
 						}
-						fire_notepres(midi, tick, actual_track_chunks, msg & 0xF, note, pressure);
+						ev_new = ev_notepressure(tick, msg & 0xF, note, pressure);
 					}
 					else if (msg >= 0xB0 && msg < 0xC0){ // Control Change
 						if (p + 1 >= p_end){
@@ -455,7 +479,7 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 								"in track %d", val, actual_track_chunks);
 							val ^= 0x80;
 						}
-						fire_ctrlchg(midi, tick, actual_track_chunks, msg & 0xF, ctrl, val);
+						ev_new = ev_controlchange(tick, msg & 0xF, ctrl, val);
 					}
 					else if (msg >= 0xC0 && msg < 0xD0){ // Program Change
 						if (p >= p_end){
@@ -470,7 +494,7 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 								"%02X) in track %d", patch, actual_track_chunks);
 							patch ^= 0x80;
 						}
-						fire_prgchg(midi, tick, actual_track_chunks, msg & 0xF, patch);
+						ev_new = ev_programchange(tick, msg & 0xF, patch);
 					}
 					else if (msg >= 0xD0 && msg < 0xE0){ // Channel Pressure
 						if (p >= p_end){
@@ -485,7 +509,7 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 								"%02X) in track %d", pressure, actual_track_chunks);
 							pressure ^= 0x80;
 						}
-						fire_chanpres(midi, tick, actual_track_chunks, msg & 0xF, pressure);
+						ev_new = ev_channelpressure(tick, msg & 0xF, pressure);
 					}
 					else if (msg >= 0xE0 && msg < 0xF0){ // Pitch Bend
 						if (p + 1 >= p_end){
@@ -506,7 +530,7 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 								"%02X) in track %d", p2, actual_track_chunks);
 							p2 ^= 0x80;
 						}
-						fire_pitchbend(midi, tick, actual_track_chunks, msg & 0xF, p1 | (p2 << 7));
+						ev_new = ev_pitchbend(tick, msg & 0xF, p1 | (p2 << 7));
 					}
 					else if (msg == 0xF0 || msg == 0xF7){ // SysEx Event
 						running_status = -1; // TODO: validate we should clear this
@@ -590,13 +614,28 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 											"event in track %d", len - 3, len - 3 == 1 ? "" : "s",
 											actual_track_chunks);
 									}
-									fire_settempo(midi, tick, actual_track_chunks,
+									ev_new = ev_tempo(tick,
 										((int)data[p + 0] << 16) | ((int)data[p + 1] << 8) |
 										data[p + 2]);
 								}
 								break;
 							case 0x54: // 05 HH MM SS RR TT SMPTE Offset
+								break;
 							case 0x58: // 04 NN MM LL TT    Time Signature
+								if (len < 4){
+									warn(f_warn, warnuser, "Missing data for Time Signature event "
+										"in track %d", actual_track_chunks);
+								}
+								else{
+									if (len > 4){
+										warn(f_warn, warnuser, "Extra %d byte%s for Time Signature "
+											"event in track %d", len - 4, len - 4 == 1 ? "" : "s",
+											actual_track_chunks);
+									}
+									ev_new = ev_timesig(tick,
+										data[p], data[p + 1], data[p + 2], data[p + 3]);
+								}
+								break;
 							case 0x59: // 02 SS MM          Key Signature
 							case 0x7F: // LL data           Sequencer-Specific Meta Event
 								break;
@@ -611,6 +650,10 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 						warn(f_warn, warnuser, "Unknown message type %02X in track %d",
 							msg, actual_track_chunks);
 						goto mtrk_end;
+					}
+					if (ev_new){
+						// TODO: use ev_new
+						nm_free(ev_new);
 					}
 				}
 				warn(f_warn, warnuser, "Track %d ended before receiving End of Track message",
@@ -649,30 +692,32 @@ nm_ctx nm_ctx_new(nm_midi midi, int samples_per_sec){
 	ctx->ticks_per_sec = 0;
 	ctx->samples_per_sec = samples_per_sec;
 	ctx->ignore_timesig = false;
-	ctx->notes = nm_alloc(sizeof(nm_note_st) * 128 * midi->max_channels);
-	if (ctx->notes == NULL){
+	ctx->chans = nm_alloc(sizeof(nm_channel_st) * midi->max_channels);
+	if (ctx->chans == NULL){
 		nm_free(ctx);
 		return NULL;
 	}
 	for (int ch = 0, i = 0; ch < midi->max_channels; ch++){
+		ctx->chans[ch].pressure = 0;
+		ctx->chans[ch].pitch_bend = 0;
 		for (int nt = 0; nt < 128; nt++, i++){
-			ctx->notes[i].note = nt;
-			ctx->notes[i].freq = 440.0 * pow(2.0, (nt - 69.0) / 12.0);
-			ctx->notes[i].hit_velocity = 1;
-			ctx->notes[i].hold_pressure = 1;
-			ctx->notes[i].pitch_bend = 0;
-			ctx->notes[i].release_velocity = 1;
-			ctx->notes[i].pressed = false;
+			ctx->chans[ch].notes[i].note = nt;
+			ctx->chans[ch].notes[i].freq = 440.0 * pow(2.0, (nt - 69.0) / 12.0);
+			ctx->chans[ch].notes[i].hit_velocity = 1;
+			ctx->chans[ch].notes[i].hold_pressure = 1;
+			ctx->chans[ch].notes[i].release_velocity = 1;
+			ctx->chans[ch].notes[i].pressed = false;
 		}
 	}
 	return ctx;
 }
 
 int nm_ctx_process(nm_ctx ctx, int sample_len, nm_sample_st *samples){
+	return 0;
 }
 
 void nm_ctx_free(nm_ctx ctx){
-	nm_free(ctx->notes);
+	nm_free(ctx->chans);
 	nm_free(ctx);
 }
 

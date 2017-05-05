@@ -241,7 +241,7 @@ Converting bytes 0-127 to notes is based on the fact that note 69 (`45` hex) is 
 websites report the wrong octave for a given MIDI note value.  The table below assigns octaves
 based on the fact that Middle C should be Octave 4.
 
-Therefore, default tuning will be: Frequency = 440 &times; 2<sup>(Note - 69) / 12</sup>
+Default tuning will be: Frequency = 440 &times; 2<sup>(Note - 69) / 12</sup>
 
 | Octave |  C   |  C#  |  D   |  D#  |  E   |  F   |  F#  |  G   |  G#  |  A   |  A#  |  B   |
 |:------:|:----:|:----:|:----:|:----:|:----:|:----:|:----:|:----:|:----:|:----:|:----:|:----:|

@@ -9,8 +9,10 @@
 #include <stdlib.h>
 
 typedef void *(*nm_alloc_func)(size_t size);
+typedef void *(*nm_realloc_func)(void *ptr, size_t size);
 typedef void (*nm_free_func)(void *ptr);
 extern nm_alloc_func nm_alloc;
+extern nm_realloc_func nm_realloc;
 extern nm_free_func nm_free;
 
 typedef enum {
@@ -21,7 +23,8 @@ typedef enum {
 	NM_PROGRAMCHANGE,
 	NM_CHANNELPRESSURE,
 	NM_PITCHBEND,
-	NM_TEMPO
+	NM_TEMPO,
+	NM_TIMESIG
 } nm_event_type;
 
 typedef struct nm_event_struct nm_event_st, *nm_event;
@@ -32,13 +35,13 @@ struct nm_event_struct {
 	union {
 		struct { int channel; int note; float velocity; } noteoff;
 		struct { int channel; int note; float velocity; } noteon;
-		struct { int channel; int note; int pressure; } notepressure;
-		struct { int channel; int control; int value; } controlchange;
-		struct { int channel; int patch;              } programchange;
-		struct { int channel; int pressure;           } channelpressure;
-		struct { int channel; int bend;               } pitchbend;
-		struct { int tempo;                           } tempo;
-		struct { int num; int den; int
+		struct { int channel; int note; float pressure; } notepressure;
+		struct { int channel; int control; int value;   } controlchange;
+		struct { int channel; int patch;                } programchange;
+		struct { int channel; float pressure;           } channelpressure;
+		struct { int channel; float bend;               } pitchbend;
+		struct { int tempo;                             } tempo;
+		struct { int num; int den; int cc; int dd;      } timesig;
 	} u;
 };
 
