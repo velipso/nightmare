@@ -323,7 +323,7 @@ When we receive the Division parameter from the header (*ticks per quarter-note*
 *ticks per second* by simply multiplying the Division by 2.
 
 If we receive a Set Tempo event (`TTTTTT` *microseconds per quarter-note*), we can recalculate
-*ticks per second* to be Division * 1,000,000 / `TTTTTT`.
+*ticks per second* to be Division &mul; 1,000,000 / `TTTTTT`.
 
 If a Time Signature Meta Event comes after a Set Tempo event, it can safely be ignored -- it will
 change the size of a quarter-note, but that doesn't matter because the ticks per second calculation
@@ -331,4 +331,4 @@ cancels out the quarter notes.
 
 However, if a Time Signature Meta Event comes *before* a Set Tempo event, then that will change the
 quarter-notes per beat, which means we'll use the 120 beats per minute default tempo (2 beats per
-second) to figure out the *ticks per second*: Division * 2 * 2<sup>2 - `MM`</sup>
+second) to figure out the *ticks per second*: Division &mul; 2 &mul; 2<sup>2 - `MM`</sup>
