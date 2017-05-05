@@ -286,11 +286,13 @@ TODO
 
 The MIDI specification has a lot of ways to represent timing.
 
+The unit of the Delta Timestamps is *ticks* passed since previous event.  But what is a *tick*?
+Specifically, we need to calculate *ticks per second*.
+
 The unit of the Division parameter in the header is *ticks per quarter-note*.
 
-The unit of the Delta Timestamps is *ticks* passed since previous event.
-
-The unit of the Set Tempo Meta Event is *microseconds per quarter-note*.
+The unit of the Set Tempo Meta Event (`TTTTTT`) is *microseconds per quarter-note*.  Reminder: there
+are 1,000,000 *microseconds per second*.
 
 If Set Tempo is not set, then the default value is 120 *beats per minute*.
 
@@ -305,3 +307,28 @@ way:
 | `03` | 8                          | 1/2                    |
 | `04` | 16                         | 1/4                    |
 | `MM` | 2<sup>`MM`</sup>           | 2<sup>2 - `MM`</sup>   |
+
+If Time Signature is not set, the denominator defaults to 4, which represents 1 quarter-note per
+beat.
+
+The MIDI specification also talks about another unit, the *MIDI clock*, which is simply 1/24th the
+length of a quarter-note.
+
+So with all this information, we can calculate the *ticks per second*:
+
+We start assuming 120 *beats per minute* and 1 *quarter-note per beat*, therefore we have 120
+*quarter-notes per minute*, or 2 *quarter-notes per second*.
+
+When we receive the Division parameter from the header (*ticks per quarter-note*), we can calculate
+*ticks per second* by simply multiplying the Division by 2.
+
+If we receive a Set Tempo event (`TTTTTT` *microseconds per quarter-note*), we can recalculate
+*ticks per second* to be Division * 1,000,000 / `TTTTTT`.
+
+If a Time Signature Meta Event comes after a Set Tempo event, it can safely be ignored -- it will
+change the size of a quarter-note, but that doesn't matter because the ticks per second calculation
+cancels out the quarter notes.
+
+However, if a Time Signature Meta Event comes *before* a Set Tempo event, then that will change the
+quarter-notes per beat, which means we'll use the 120 beats per minute default tempo to figure out
+the *ticks per second*: Division * 2 * 2<sup>2 - `MM`</sup>
