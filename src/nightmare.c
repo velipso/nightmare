@@ -661,8 +661,15 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 						goto mtrk_end;
 					}
 					if (ev_new){
-						// TODO: use ev_new
-						nm_free(ev_new);
+						if (ev_first == NULL){
+							ev_first = ev_new;
+							ev_last = ev_new;
+							midi->tracks[track_i] = ev_first;
+						}
+						else{
+							ev_last->next = ev_new;
+							ev_last = ev_new;
+						}
 					}
 				}
 				warn(f_warn, warnuser, "Track %d ended before receiving End of Track message",
@@ -732,7 +739,15 @@ void nm_ctx_free(nm_ctx ctx){
 
 void nm_midi_free(nm_midi midi){
 	if (midi->tracks){
-		// TODO: follow linked list and free each event
+		for (int i = 0; i < midi->track_count; i++){
+			nm_event ev_here = midi->tracks[i];
+			while (ev_here){
+				nm_event delme = ev_here;
+				ev_here = ev_here->next;
+				nm_free(delme);
+			}
+		}
+		nm_free(midi->tracks);
 	}
 	nm_free(midi);
 }
