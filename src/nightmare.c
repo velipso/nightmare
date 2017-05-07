@@ -769,6 +769,8 @@ nm_ctx nm_ctx_new(nm_midi midi, int track, int samples_per_sec){
 			ctx->chans[ch].notes[nt].release = false;
 		}
 	}
+	for (int i = 0; i < 128; i++)
+		ctx->notedowns[i] = 0;
 	ctx->ev = midi->tracks[track];
 	return ctx;
 }
@@ -781,7 +783,7 @@ static void render_sect(nm_ctx ctx, uint64_t samples_done, int len, nm_sample_st
 			float dfade = ctx->chans[i].notes[n].dfade;
 			if (ctx->chans[i].notes[n].hit){
 				ctx->chans[i].notes[n].hit = false;
-				dfade = 1.0f / (0.1f * ctx->samples_per_sec);
+				dfade = 1.0f / (0.03f * ctx->samples_per_sec);
 				ctx->chans[i].notes[n].dfade = dfade;
 			}
 			else if (ctx->chans[i].notes[n].release){
@@ -793,7 +795,7 @@ static void render_sect(nm_ctx ctx, uint64_t samples_done, int len, nm_sample_st
 				float amp = ctx->chans[i].notes[n].hit_velocity;
 				float freq = ctx->chans[i].notes[n].freq;
 				for (int a = 0; a < len; a++){
-					float v = fade * fade * amp *
+					float v = fade * fade * amp * amp *
 						sinf(M_PI * 2.0f * freq * (((double)samples_done) + a) / ctx->samples_per_sec);
 					if (fade < 1 && dfade > 0){
 						fade += dfade;
@@ -824,6 +826,22 @@ int nm_ctx_process(nm_ctx ctx, int sample_len, nm_sample_st *samples){
 			render_sect(ctx, ctx->samples_done, sample_len - total_out, &samples[total_out]);
 			ctx->ticks += (double)(sample_len - total_out) / ctx->samples_per_tick;
 			ctx->samples_done += sample_len - total_out;
+			for (int i = 0; i < 128; i++){
+				int cnt = ctx->notedowns[i];
+				if (cnt == 0)
+					printf(" ");
+				else if (cnt == 1)
+					printf(".");
+				else if (cnt == 2)
+					printf(":");
+				else if (cnt == 3)
+					printf("&");
+				else if (cnt == 4)
+					printf("#");
+				else
+					printf("@");
+			}
+			printf("|\n");
 			return sample_len;
 		}
 
@@ -839,7 +857,7 @@ int nm_ctx_process(nm_ctx ctx, int sample_len, nm_sample_st *samples){
 			case NM_NOTEOFF: {
 				nm_note_st *note = &ctx->chans[ev->u.noteoff.channel].notes[ev->u.noteoff.note];
 				if (note->down){
-					printf("NOTE OFF %02X\n", ev->u.noteoff.note);
+					ctx->notedowns[ev->u.noteoff.note]--;
 					note->release = true;
 					note->down = false;
 					note->release_velocity = ev->u.noteoff.velocity;
@@ -848,7 +866,7 @@ int nm_ctx_process(nm_ctx ctx, int sample_len, nm_sample_st *samples){
 			case NM_NOTEON: {
 				nm_note_st *note = &ctx->chans[ev->u.noteon.channel].notes[ev->u.noteon.note];
 				if (!note->down){
-					printf("NOTE ON  %02X\n", ev->u.noteon.note);
+					ctx->notedowns[ev->u.noteon.note]++;
 					note->hit = true;
 					note->down = true;
 					note->hit_velocity = ev->u.noteon.velocity;

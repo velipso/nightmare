@@ -12,7 +12,7 @@
 #include <dirent.h>
 #include <sys/stat.h>
 
-const int sample_buffer_size = 4096;
+const int sample_buffer_size = 1024;
 
 static bool fs_isdir(const char *dir){
 	struct stat buf;
@@ -163,28 +163,24 @@ int main(int argc, char **argv){
 	nm_free = db_free;
 	#endif
 
-	//fs_readdir("/Users/sean/Downloads/midi/data", each_midi);
-	//process_midi("/Users/sean/Downloads/midi/data/f/For_Those_About_To_Rock.MID"); // largest file
-	//process_midi("/Users/sean/Downloads/midi/data/c/cantina13.mid");
-	//process_midi("/Users/sean/Downloads/midi/data/q/qfg4open.mid");
-	//process_midi("/Users/sean/Downloads/midi/data/m/mario.mid");
-	//process_midi("/Users/sean/Downloads/midi/data/0/010Ratanakosin.mid");
-	//process_midi("/Users/sean/Downloads/midi/data/0/001.mid");
-	//process_midi("/Users/sean/Downloads/midi/data/0/00warcraft2.mid");
-	//process_midi("/Users/sean/Downloads/midi/data/8/82-01-medley.mid");
-	//process_midi("/Users/sean/Downloads/midi/data/z/Zelda3ocarina.mid"); // very small and simple
+	if (argc < 2){
+		printf("Usage: ./nightmare file.mid\n");
+		return 0;
+	}
 
-	// "/Users/sean/Downloads/midi/data/f/For_Those_About_To_Rock.MID"
-	//     has an 0-size MTrk which is followed by track data that goes until EOF
+	// z/Zelda3ocarina.mid              // very small and simple
+	// f/For_Those_About_To_Rock.MID    // 0-size MTrk
 
-	//printf("warnings from %d / %d (%g)\n", tot_warn, tot_all,
-	//	(double)tot_warn * 100.0 / (double)tot_all);
+	// TODO:
+	//  pitch bends
+	//  understand control changes
+	//  synth plugins
+	//  drums
+	//  additive synth
 
-	//const char *file = "/Users/sean/Downloads/midi/data/z/Zelda3ocarina.mid";
-	const char *file = "/Users/sean/Downloads/midi/data/s/santa_monica.mid";
-	nm_midi midi = nm_midi_newfile(file, midi_warn, NULL);
+	nm_midi midi = nm_midi_newfile(argv[1], midi_warn, NULL);
 	if (midi == NULL){
-		fprintf(stderr, "Failed to load MIDI file\n");
+		fprintf(stderr, "Failed to load MIDI file: %s\n", argv[1]);
 		return 1;
 	}
 	nm_ctx ctx = nm_ctx_new(midi, 0, 48000);

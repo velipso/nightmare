@@ -79,6 +79,7 @@ typedef struct {
 	nm_channel_st *chans;
 	nm_event ev;
 	double samples_per_sec;
+	int notedowns[128];
 	bool ignore_timesig;
 } nm_ctx_st, *nm_ctx;
 
