@@ -165,7 +165,7 @@ sdl_src video/dummy/SDL_nullvideo.c
 # compile the source files
 # -fwrapv   integers should wrap around like normal
 # -Werror   elevate warnings to errors
-DEBUG_FLAG=
+DEBUG_FLAG=-DNDEBUG
 if [ "$1" = "debug" ]; then
 	echo Debug Build
 	DEBUG_FLAG=-g

@@ -58,7 +58,11 @@ typedef struct {
 	float hit_velocity;
 	float hold_pressure;
 	float release_velocity;
-	bool pressed;
+	float fade;
+	float dfade;
+	bool hit;
+	bool down;
+	bool release;
 } nm_note_st;
 
 typedef struct {
@@ -69,10 +73,12 @@ typedef struct {
 
 typedef struct {
 	nm_midi midi;
-	uint64_t ticks;
-	double ticks_per_sec;
+	double ticks;
+	double samples_per_tick;
+	uint64_t samples_done;
 	nm_channel_st *chans;
-	int samples_per_sec;
+	nm_event ev;
+	double samples_per_sec;
 	bool ignore_timesig;
 } nm_ctx_st, *nm_ctx;
 
@@ -83,11 +89,12 @@ typedef struct {
 	float R;
 } nm_sample_st;
 
-nm_midi nm_midi_newfile(const char *file, nm_midi_warn_func f_warn, void *warnuser);
-nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn, void *warnuser);
-nm_ctx  nm_ctx_new(nm_midi midi, int samples_per_sec);
-int     nm_ctx_process(nm_ctx ctx, int sample_len, nm_sample_st *samples);
-void    nm_ctx_free(nm_ctx ctx);
-void    nm_midi_free(nm_midi midi);
+nm_midi     nm_midi_newfile(const char *file, nm_midi_warn_func f_warn, void *warnuser);
+nm_midi     nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn, void *warnuser);
+const char *nm_event_type_str(nm_event_type type);
+nm_ctx      nm_ctx_new(nm_midi midi, int track, int samples_per_sec);
+int         nm_ctx_process(nm_ctx ctx, int sample_len, nm_sample_st *samples);
+void        nm_ctx_free(nm_ctx ctx);
+void        nm_midi_free(nm_midi midi);
 
 #endif // NIGHTMARE__H

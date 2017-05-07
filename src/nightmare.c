@@ -6,6 +6,8 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <math.h>
+#include <assert.h>
+#include <string.h>
 
 nm_alloc_func nm_alloc = malloc;
 nm_realloc_func nm_realloc = realloc;
@@ -247,7 +249,6 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 	int format;
 	int track_chunks;
 	int track_i = 0;
-	int ticks_per_q;
 	int tempo;
 	int timesig_num;
 	int timesig_den;
@@ -319,15 +320,17 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 					track_chunks = -1;
 				}
 				if (chk.data_size >= 6){
-					ticks_per_q = ((int)data[chk.data_start + 2] << 8) | data[chk.data_start + 3];
-					if (ticks_per_q & 0x8000){
+					int t = ((int)data[chk.data_start + 4] << 8) | data[chk.data_start + 5];
+					if (t & 0x8000){
 						warn(f_warn, warnuser, "Unsupported timing format (SMPTE)");
-						//TODO: set ticks_per_q to sane value
+						midi->ticks_per_q = 1;
 					}
+					else
+						midi->ticks_per_q = t;
 				}
 				else{
 					warn(f_warn, warnuser, "Header missing division");
-					//TODO: set ticks_per_q to sane value
+					midi->ticks_per_q = 1;
 				}
 			} break;
 
@@ -341,10 +344,8 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 					tempo = 120;
 					timesig_num = 4;
 					timesig_den = 4;
-					midi->tracks =
-						nm_realloc(midi->tracks, sizeof(nm_event) * (track_i + 1));
-					for (int i = 0; i < 16; i++)
-						midi->tracks[track_i * 16 + i] = NULL;
+					midi->tracks = nm_realloc(midi->tracks, sizeof(nm_event) * (track_i + 1));
+					midi->tracks[track_i] = NULL;
 					midi->track_count = track_i + 1;
 				}
 				if (format == 1)
@@ -622,9 +623,14 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 											"event in track %d", len - 3, len - 3 == 1 ? "" : "s",
 											track_i);
 									}
-									ev_new = ev_tempo(tick,
-										((int)data[p + 0] << 16) | ((int)data[p + 1] << 8) |
-										data[p + 2]);
+									int tempo = ((int)data[p + 0] << 16) | ((int)data[p + 1] << 8) |
+										data[p + 2];
+									if (tempo == 0){
+										warn(f_warn, warnuser, "Invalid tempo (0) for track %d",
+											track_i);
+									}
+									else
+										ev_new = ev_tempo(tick, tempo);
 								}
 								break;
 							case 0x54: // 05 HH MM SS RR TT SMPTE Offset
@@ -660,8 +666,30 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 						goto mtrk_end;
 					}
 					if (ev_new){
-						if (ev_last == NULL)
-							midi->tracks[track_i] = ev_last = ev_new;
+						if (ev_last == NULL){
+							if (format == 2)
+								midi->tracks[track_i] = (ev_last = ev_new);
+							else{
+								// insert ev_new into tracks[0]
+								if (midi->tracks[0] == NULL)
+									midi->tracks[0] = ev_new;
+								else{
+									nm_event here = midi->tracks[0];
+									if (ev_new->tick < here->tick){
+										// insert at start
+										ev_new->next = here;
+										midi->tracks[0] = ev_new;
+									}
+									else{
+										while (here->next && here->next->tick < ev_new->tick)
+											here = here->next;
+										// insert after here
+										ev_new->next = here->next;
+										here->next = ev_new;
+									}
+								}
+							}
+						}
 						else
 							ev_last = (ev_last->next = ev_new);
 					}
@@ -693,13 +721,31 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 	return midi;
 }
 
-nm_ctx nm_ctx_new(nm_midi midi, int samples_per_sec){
+const char *nm_event_type_str(nm_event_type type){
+	switch (type){
+		case NM_NOTEOFF:         return "Note Off";
+		case NM_NOTEON:          return "Note On";
+		case NM_NOTEPRESSURE:    return "Note Pressure";
+		case NM_CONTROLCHANGE:   return "Control Change";
+		case NM_PROGRAMCHANGE:   return "Program Change";
+		case NM_CHANNELPRESSURE: return "Channel Pressure";
+		case NM_PITCHBEND:       return "Pitch Bend";
+		case NM_TEMPO:           return "Tempo";
+		case NM_TIMESIG:         return "Time Signature";
+	}
+	return "Unknown";
+}
+
+nm_ctx nm_ctx_new(nm_midi midi, int track, int samples_per_sec){
+	if (track < 0 || track >= midi->track_count)
+		return NULL;
 	nm_ctx ctx = nm_alloc(sizeof(nm_ctx_st));
 	if (ctx == NULL)
 		return NULL;
 	ctx->midi = midi;
 	ctx->ticks = 0;
-	ctx->ticks_per_sec = 0;
+	ctx->samples_done = 0;
+	ctx->samples_per_tick = (double)samples_per_sec / ((double)midi->ticks_per_q * 2.0);
 	ctx->samples_per_sec = samples_per_sec;
 	ctx->ignore_timesig = false;
 	ctx->chans = nm_alloc(sizeof(nm_channel_st) * midi->max_channels);
@@ -707,23 +753,134 @@ nm_ctx nm_ctx_new(nm_midi midi, int samples_per_sec){
 		nm_free(ctx);
 		return NULL;
 	}
-	for (int ch = 0, i = 0; ch < midi->max_channels; ch++){
+	for (int ch = 0; ch < midi->max_channels; ch++){
 		ctx->chans[ch].pressure = 0;
 		ctx->chans[ch].pitch_bend = 0;
-		for (int nt = 0; nt < 128; nt++, i++){
-			ctx->chans[ch].notes[i].note = nt;
-			ctx->chans[ch].notes[i].freq = 440.0 * pow(2.0, (nt - 69.0) / 12.0);
-			ctx->chans[ch].notes[i].hit_velocity = 1;
-			ctx->chans[ch].notes[i].hold_pressure = 1;
-			ctx->chans[ch].notes[i].release_velocity = 1;
-			ctx->chans[ch].notes[i].pressed = false;
+		for (int nt = 0; nt < 128; nt++){
+			ctx->chans[ch].notes[nt].note = nt;
+			ctx->chans[ch].notes[nt].freq = 440.0 * pow(2.0, (nt - 69.0) / 12.0);
+			ctx->chans[ch].notes[nt].hit_velocity = 1;
+			ctx->chans[ch].notes[nt].hold_pressure = 1;
+			ctx->chans[ch].notes[nt].release_velocity = 1;
+			ctx->chans[ch].notes[nt].fade = 0;
+			ctx->chans[ch].notes[nt].dfade = 0;
+			ctx->chans[ch].notes[nt].hit = false;
+			ctx->chans[ch].notes[nt].down = false;
+			ctx->chans[ch].notes[nt].release = false;
 		}
 	}
+	ctx->ev = midi->tracks[track];
 	return ctx;
 }
 
+static void render_sect(nm_ctx ctx, uint64_t samples_done, int len, nm_sample_st *samples){
+	memset(samples, 0, sizeof(nm_sample_st) * len);
+	for (int i = 0; i < ctx->midi->max_channels; i++){
+		for (int n = 0; n < 128; n++){
+			float fade = ctx->chans[i].notes[n].fade;
+			float dfade = ctx->chans[i].notes[n].dfade;
+			if (ctx->chans[i].notes[n].hit){
+				ctx->chans[i].notes[n].hit = false;
+				dfade = 1.0f / (0.1f * ctx->samples_per_sec);
+				ctx->chans[i].notes[n].dfade = dfade;
+			}
+			else if (ctx->chans[i].notes[n].release){
+				ctx->chans[i].notes[n].release = false;
+				dfade = -1.0f / (0.1f * ctx->samples_per_sec);
+				ctx->chans[i].notes[n].dfade = dfade;
+			}
+			if (fade > 0 || dfade > 0){
+				float amp = ctx->chans[i].notes[n].hit_velocity;
+				float freq = ctx->chans[i].notes[n].freq;
+				for (int a = 0; a < len; a++){
+					float v = fade * fade * amp *
+						sinf(M_PI * 2.0f * freq * (((double)samples_done) + a) / ctx->samples_per_sec);
+					if (fade < 1 && dfade > 0){
+						fade += dfade;
+						if (fade > 1)
+							fade = 1;
+					}
+					else if (fade > 0 && dfade < 0){
+						fade += dfade;
+						if (fade < 0)
+							fade = 0;
+					}
+					samples[a].L += v;
+					samples[a].R += v;
+				}
+				ctx->chans[i].notes[n].fade = fade;
+			}
+		}
+	}
+}
+
 int nm_ctx_process(nm_ctx ctx, int sample_len, nm_sample_st *samples){
-	return 0;
+	int total_out = 0;
+	nm_event ev = ctx->ev;
+	while (ev){
+		double next_ev_sample = round(((double)ev->tick - ctx->ticks) * ctx->samples_per_tick);
+		if (next_ev_sample > sample_len - total_out){
+			// the next event is after these samples, so just render the rest and return
+			render_sect(ctx, ctx->samples_done, sample_len - total_out, &samples[total_out]);
+			ctx->ticks += (double)(sample_len - total_out) / ctx->samples_per_tick;
+			ctx->samples_done += sample_len - total_out;
+			return sample_len;
+		}
+
+		if (next_ev_sample > 0){
+			// render before the event
+			render_sect(ctx, ctx->samples_done, next_ev_sample, &samples[total_out]);
+			total_out += next_ev_sample;
+			ctx->ticks += next_ev_sample / ctx->samples_per_tick;
+			ctx->samples_done += next_ev_sample;
+		}
+		// process event
+		switch (ev->type){
+			case NM_NOTEOFF: {
+				nm_note_st *note = &ctx->chans[ev->u.noteoff.channel].notes[ev->u.noteoff.note];
+				if (note->down){
+					printf("NOTE OFF %02X\n", ev->u.noteoff.note);
+					note->release = true;
+					note->down = false;
+					note->release_velocity = ev->u.noteoff.velocity;
+				}
+			} break;
+			case NM_NOTEON: {
+				nm_note_st *note = &ctx->chans[ev->u.noteon.channel].notes[ev->u.noteon.note];
+				if (!note->down){
+					printf("NOTE ON  %02X\n", ev->u.noteon.note);
+					note->hit = true;
+					note->down = true;
+					note->hit_velocity = ev->u.noteon.velocity;
+				}
+			} break;
+			case NM_NOTEPRESSURE:
+				break;
+			case NM_CONTROLCHANGE:
+				break;
+			case NM_PROGRAMCHANGE:
+				break;
+			case NM_CHANNELPRESSURE:
+				break;
+			case NM_PITCHBEND:
+				break;
+			case NM_TEMPO:
+				ctx->ignore_timesig = true;
+				ctx->samples_per_tick = (ctx->samples_per_sec * ev->u.tempo.tempo) /
+					(1000000.0 * ctx->midi->ticks_per_q);
+				printf("TEMPO   samples per tick: %g\n", ctx->samples_per_tick);
+				break;
+			case NM_TIMESIG:
+				if (!ctx->ignore_timesig){
+					ctx->samples_per_tick = ctx->samples_per_sec /
+						(ctx->midi->ticks_per_q * 2.0 * pow(2.0, 2.0 - ev->u.timesig.den));
+					printf("TIMESIG  samples per tick: %g\n", ctx->samples_per_tick);
+				}
+				break;
+		}
+		ctx->ev = (ev = ev->next);
+	}
+	return total_out;
 }
 
 void nm_ctx_free(nm_ctx ctx){

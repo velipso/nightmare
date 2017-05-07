@@ -309,7 +309,7 @@ TODO
 The MIDI specification has a lot of ways to represent timing.
 
 The unit of the Delta Timestamps is *ticks* passed since previous event.  But what is a *tick*?
-Specifically, we need to calculate *ticks per second*.
+Specifically, we need to calculate *samples per tick*.
 
 The unit of the Division parameter in the header is *ticks per quarter-note*.
 
@@ -336,25 +336,29 @@ beat.
 The MIDI specification also talks about another unit, the *MIDI clock*, which is simply
 <sup>1</sup>/<sub>24th</sub> the length of a quarter-note.
 
-So with all this information, we can calculate the *ticks per second*:
+Lastly, Sample Rate (*samples per second*) is provided by the audio output format.
+
+So with all this information, we can calculate the *samples per tick*:
 
 We start assuming 120 *beats per minute* and 1 *quarter-note per beat*, therefore we have 120
 *quarter-notes per minute*, or 2 *quarter-notes per second*.
 
-When we receive the Division parameter from the header (*ticks per quarter-note*), we can calculate
-*ticks per second* by simply multiplying the Division by 2.
+When we receive the Division parameter from the header (*ticks per quarter-note*) and the Sample
+Rate (*samples per second*) from the audio device, we can calculate *samples per tick* via:
+Sample Rate / (Division &times; 2)
 
 If we receive a Set Tempo event (`TTTTTT` *microseconds per quarter-note*), we can recalculate
-*ticks per second* to be Division &times; 1,000,000 / `TTTTTT`.
+*samples per tick* to be: (Sample Rate &times; `TTTTTT`) / (1,000,000 &times; Division)
 
 If a Time Signature Meta Event comes after a Set Tempo event, it can safely be ignored -- it will
-change the size of a quarter-note, but that doesn't matter because the ticks per second calculation
-cancels out the quarter-notes.
+change the size of a quarter-note, but that doesn't matter because the calculation cancels out the
+quarter-notes.
 
 However, if a Time Signature Meta Event comes *before* a Set Tempo event, then that will change the
 quarter-notes per beat, which means we'll use the 120 beats per minute default tempo (2 beats per
-second) to figure out the *ticks per second*: Division &times; 2 &times; 2<sup>2 - `MM`</sup>
+second) to figure out the *samples per tick*: Sample Rate /
+(Division &times; 2 &times; 2<sup>2 - `MM`</sup>)
 
 One last note: there needs to be care taken when calculating timing because a MIDI file can change
 the tempo or time signature during the middle of the song, which will change how ticks map to
-seconds.
+samples.
