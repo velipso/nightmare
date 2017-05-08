@@ -83,15 +83,15 @@ typedef struct {
 	bool ignore_timesig;
 } nm_ctx_st, *nm_ctx;
 
-typedef void (*nm_midi_warn_func)(const char *warning, void *user);
+typedef void (*nm_warn_func)(const char *warning, void *user);
 
 typedef struct {
 	float L;
 	float R;
 } nm_sample_st;
 
-nm_midi     nm_midi_newfile(const char *file, nm_midi_warn_func f_warn, void *warnuser);
-nm_midi     nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn, void *warnuser);
+nm_midi     nm_midi_newfile(const char *file, nm_warn_func f_warn, void *user);
+nm_midi     nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_warn_func f_warn, void *user);
 const char *nm_event_type_str(nm_event_type type);
 nm_ctx      nm_ctx_new(nm_midi midi, int track, int samples_per_sec);
 int         nm_ctx_process(nm_ctx ctx, int sample_len, nm_sample_st *samples);

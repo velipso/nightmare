@@ -5,9 +5,12 @@ This document is my attempt at simplifying and clairifying the MIDI file format.
 
 I've used three primary sources of information:
 
-1. [Official MIDI specification](https://midi.org)
+1. [Official MIDI specifications](https://midi.org)
 2. [Yamaha XF Format specification](http://www.jososoft.dk/yamaha//pdf/xfspec.pdf)
 3. Real-world MIDI files
+
+I also searched the Internet for random things I found in the files, to hopefully dig up some
+additional context and information.
 
 My intention is to document what a MIDI file *should* look like (for encoders), but also what
 real-world data looks like (for lenient decoders).

@@ -13,7 +13,7 @@ nm_alloc_func nm_alloc = malloc;
 nm_realloc_func nm_realloc = realloc;
 nm_free_func nm_free = free;
 
-static void warn(nm_midi_warn_func f_warn, void *warnuser, const char *fmt, ...){
+static void warn(nm_warn_func f_warn, void *user, const char *fmt, ...){
 	if (f_warn == NULL)
 		return;
 	va_list args, args2;
@@ -24,11 +24,11 @@ static void warn(nm_midi_warn_func f_warn, void *warnuser, const char *fmt, ...)
 	vsprintf(buf, fmt, args2);
 	va_end(args);
 	va_end(args2);
-	f_warn(buf, warnuser);
+	f_warn(buf, user);
 	nm_free(buf);
 }
 
-nm_midi nm_midi_newfile(const char *file, nm_midi_warn_func f_warn, void *warnuser){
+nm_midi nm_midi_newfile(const char *file, nm_warn_func f_warn, void *user){
 	FILE *fp = fopen(file, "rb");
 	if (fp == NULL)
 		return NULL;
@@ -46,7 +46,7 @@ nm_midi nm_midi_newfile(const char *file, nm_midi_warn_func f_warn, void *warnus
 		return NULL;
 	}
 	fclose(fp);
-	nm_midi midi = nm_midi_newbuffer(size, data, f_warn, warnuser);
+	nm_midi midi = nm_midi_newbuffer(size, data, f_warn, user);
 	nm_free(data);
 	return midi;
 }
@@ -236,11 +236,11 @@ static inline nm_event ev_timesig(uint64_t tick, int num, int den, int cc, int d
 	return ev;
 }
 
-nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn, void *warnuser){
+nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_warn_func f_warn, void *user){
 	if (size < 14 ||
 		data[0] != 'M' || data[1] != 'T' || data[2] != 'h' || data[3] != 'd' ||
 		data[4] !=  0  || data[5] !=  0  || data[6] !=  0  || data[7] < 6){
-		warn(f_warn, warnuser, "Invalid header");
+		warn(f_warn, user, "Invalid header");
 		return NULL;
 	}
 	nm_midi midi = NULL;
@@ -257,16 +257,16 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 	while (pos < size){
 		if (!read_chunk(pos, size, data, &chk)){
 			if (midi == NULL)
-				warn(f_warn, warnuser, "Invalid header");
+				warn(f_warn, user, "Invalid header");
 			else{
 				uint64_t dif = size - pos;
-				warn(f_warn, warnuser, "Unrecognized data (%llu byte%s) at end of file", dif,
+				warn(f_warn, user, "Unrecognized data (%llu byte%s) at end of file", dif,
 					dif == 1 ? "" : "s");
 			}
 			return midi;
 		}
 		if (chk.alignment != 0){
-			warn(f_warn, warnuser, "Chunk misaligned by %d byte%s", chk.alignment,
+			warn(f_warn, user, "Chunk misaligned by %d byte%s", chk.alignment,
 				chk.alignment == 1 ? "" : "s");
 		}
 		if (midi == NULL){
@@ -281,7 +281,7 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 		uint64_t orig_size = chk.data_size;
 		if (chk.data_start + chk.data_size > size){
 			uint64_t offset = chk.data_start + chk.data_size - size;
-			warn(f_warn, warnuser, "Chunk ends %llu byte%s too early",
+			warn(f_warn, user, "Chunk ends %llu byte%s too early",
 				offset, offset == 1 ? "" : "s");
 			chk.data_size -= offset;
 		}
@@ -289,54 +289,54 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 		switch (chk.type){
 			case 0: { // MThd
 				if (found_header)
-					warn(f_warn, warnuser, "Multiple header chunks present");
+					warn(f_warn, user, "Multiple header chunks present");
 				found_header = true;
 				if (orig_size != 6){
-					warn(f_warn, warnuser,
+					warn(f_warn, user,
 						"Header chunk has non-standard size %llu byte%s (expecting 6 bytes)",
 						orig_size, orig_size == 1 ? "" : "s");
 				}
 				if (chk.data_size >= 2){
 					format = ((int)data[chk.data_start + 0] << 8) | data[chk.data_start + 1];
 					if (format != 0 && format != 1 && format != 2){
-						warn(f_warn, warnuser, "Header reports bad format (%d)", format);
+						warn(f_warn, user, "Header reports bad format (%d)", format);
 						format = 1;
 					}
 				}
 				else{
-					warn(f_warn, warnuser, "Header missing format");
+					warn(f_warn, user, "Header missing format");
 					format = 1;
 				}
 				if (chk.data_size >= 4){
 					track_chunks = ((int)data[chk.data_start + 2] << 8) | data[chk.data_start + 3];
 					if (format == 0 && track_chunks != 1){
-						warn(f_warn, warnuser,
+						warn(f_warn, user,
 							"Format 0 expecting 1 track chunk, header is reporting %d chunks",
 							track_chunks);
 					}
 				}
 				else{
-					warn(f_warn, warnuser, "Header missing track chunk count");
+					warn(f_warn, user, "Header missing track chunk count");
 					track_chunks = -1;
 				}
 				if (chk.data_size >= 6){
 					int t = ((int)data[chk.data_start + 4] << 8) | data[chk.data_start + 5];
 					if (t & 0x8000){
-						warn(f_warn, warnuser, "Unsupported timing format (SMPTE)");
+						warn(f_warn, user, "Unsupported timing format (SMPTE)");
 						midi->ticks_per_q = 1;
 					}
 					else
 						midi->ticks_per_q = t;
 				}
 				else{
-					warn(f_warn, warnuser, "Header missing division");
+					warn(f_warn, user, "Header missing division");
 					midi->ticks_per_q = 1;
 				}
 			} break;
 
 			case 1: { // MTrk
 				if (format == 0 && track_i > 0){
-					warn(f_warn, warnuser, "Format 0 expecting 1 track chunk, found more than one");
+					warn(f_warn, user, "Format 0 expecting 1 track chunk, found more than one");
 					format = 1;
 				}
 				int chan_base = 0;
@@ -356,6 +356,7 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 				uint64_t p_end = chk.data_start + chk.data_size;
 				uint64_t tick = 0;
 				nm_event ev_last = NULL;
+				nm_event ev_insert = NULL;
 				while (p < p_end){
 					// read delta as variable int
 					nm_event ev_new = NULL;
@@ -364,14 +365,14 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 					while (true){
 						len++;
 						if (len >= 5){
-							warn(f_warn, warnuser, "Invalid timestamp in track %d",
+							warn(f_warn, user, "Invalid timestamp in track %d",
 								track_i);
 							goto mtrk_end;
 						}
 						int t = data[p++];
 						if (t & 0x80){
 							if (p >= p_end){
-								warn(f_warn, warnuser, "Invalid timestamp in track %d",
+								warn(f_warn, user, "Invalid timestamp in track %d",
 									track_i);
 								goto mtrk_end;
 							}
@@ -386,7 +387,7 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 					tick += dt;
 
 					if (p >= p_end){
-						warn(f_warn, warnuser, "Missing message in track %d", track_i);
+						warn(f_warn, user, "Missing message in track %d", track_i);
 						goto mtrk_end;
 					}
 
@@ -395,7 +396,7 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 					if (msg < 0x80){
 						// use running status
 						if (running_status < 0){
-							warn(f_warn, warnuser, "Invalid message %02X in track %d", msg,
+							warn(f_warn, user, "Invalid message %02X in track %d", msg,
 								track_i);
 							goto mtrk_end;
 						}
@@ -408,7 +409,7 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 					// interpret msg
 					if (msg >= 0x80 && msg < 0x90){ // Note-Off
 						if (p + 1 >= p_end){
-							warn(f_warn, warnuser, "Bad Note-Off message (out of data) in track %d",
+							warn(f_warn, user, "Bad Note-Off message (out of data) in track %d",
 								track_i);
 							goto mtrk_end;
 						}
@@ -416,12 +417,12 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 						uint8_t note = data[p++];
 						uint8_t vel = data[p++];
 						if (note >= 0x80){
-							warn(f_warn, warnuser, "Bad Note-Off message (invalid note %02X) in "
+							warn(f_warn, user, "Bad Note-Off message (invalid note %02X) in "
 								"track %d", note, track_i);
 							note ^= 0x80;
 						}
 						if (vel >= 0x80){
-							warn(f_warn, warnuser, "Bad Note-Off message (invalid velocity %02X) "
+							warn(f_warn, user, "Bad Note-Off message (invalid velocity %02X) "
 								"in track %d", vel, track_i);
 							vel ^= 0x80;
 						}
@@ -429,7 +430,7 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 					}
 					else if (msg >= 0x90 && msg < 0xA0){ // Note-On
 						if (p + 1 >= p_end){
-							warn(f_warn, warnuser, "Bad Note-On message (out of data) in track %d",
+							warn(f_warn, user, "Bad Note-On message (out of data) in track %d",
 								track_i);
 							goto mtrk_end;
 						}
@@ -437,12 +438,12 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 						uint8_t note = data[p++];
 						uint8_t vel = data[p++];
 						if (note >= 0x80){
-							warn(f_warn, warnuser, "Bad Note-On message (invalid note %02X) in "
+							warn(f_warn, user, "Bad Note-On message (invalid note %02X) in "
 								"track %d", note, track_i);
 							note ^= 0x80;
 						}
 						if (vel >= 0x80){
-							warn(f_warn, warnuser, "Bad Note-On message (invalid velocity %02X) "
+							warn(f_warn, user, "Bad Note-On message (invalid velocity %02X) "
 								"in track %d", vel, track_i);
 							vel ^= 0x80;
 						}
@@ -450,7 +451,7 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 					}
 					else if (msg >= 0xA0 && msg < 0xB0){ // Note Pressure
 						if (p + 1 >= p_end){
-							warn(f_warn, warnuser, "Bad Note Pressure message (out of data) in "
+							warn(f_warn, user, "Bad Note Pressure message (out of data) in "
 								"track %d", track_i);
 							goto mtrk_end;
 						}
@@ -458,12 +459,12 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 						uint8_t note = data[p++];
 						uint8_t pressure = data[p++];
 						if (note >= 0x80){
-							warn(f_warn, warnuser, "Bad Note Pressure message (invalid note %02X) "
+							warn(f_warn, user, "Bad Note Pressure message (invalid note %02X) "
 								"in track %d", note, track_i);
 							note ^= 0x80;
 						}
 						if (pressure >= 0x80){
-							warn(f_warn, warnuser, "Bad Note Pressure message (invalid pressure "
+							warn(f_warn, user, "Bad Note Pressure message (invalid pressure "
 								"%02X) in track %d", pressure, track_i);
 							pressure ^= 0x80;
 						}
@@ -471,7 +472,7 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 					}
 					else if (msg >= 0xB0 && msg < 0xC0){ // Control Change
 						if (p + 1 >= p_end){
-							warn(f_warn, warnuser, "Bad Control Change message (out of data) in "
+							warn(f_warn, user, "Bad Control Change message (out of data) in "
 								"track %d", track_i);
 							goto mtrk_end;
 						}
@@ -479,12 +480,12 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 						uint8_t ctrl = data[p++];
 						uint8_t val = data[p++];
 						if (ctrl >= 0x80){
-							warn(f_warn, warnuser, "Bad Control Change message (invalid control "
+							warn(f_warn, user, "Bad Control Change message (invalid control "
 								" %02X) in track %d", ctrl, track_i);
 							ctrl ^= 0x80;
 						}
 						if (val >= 0x80){
-							warn(f_warn, warnuser, "Bad Control Change message (invalid value %02X) "
+							warn(f_warn, user, "Bad Control Change message (invalid value %02X) "
 								"in track %d", val, track_i);
 							val ^= 0x80;
 						}
@@ -492,14 +493,14 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 					}
 					else if (msg >= 0xC0 && msg < 0xD0){ // Program Change
 						if (p >= p_end){
-							warn(f_warn, warnuser, "Bad Program Change message (out of data) in "
+							warn(f_warn, user, "Bad Program Change message (out of data) in "
 								"track %d", track_i);
 							goto mtrk_end;
 						}
 						running_status = msg;
 						uint8_t patch = data[p++];
 						if (patch >= 0x80){
-							warn(f_warn, warnuser, "Bad Program Change message (invalid patch "
+							warn(f_warn, user, "Bad Program Change message (invalid patch "
 								"%02X) in track %d", patch, track_i);
 							patch ^= 0x80;
 						}
@@ -507,14 +508,14 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 					}
 					else if (msg >= 0xD0 && msg < 0xE0){ // Channel Pressure
 						if (p >= p_end){
-							warn(f_warn, warnuser, "Bad Channel Pressure message (out of data) in "
+							warn(f_warn, user, "Bad Channel Pressure message (out of data) in "
 								"track %d", track_i);
 							goto mtrk_end;
 						}
 						running_status = msg;
 						uint8_t pressure = data[p++];
 						if (pressure >= 0x80){
-							warn(f_warn, warnuser, "Bad Channel Pressure message (invalid pressure "
+							warn(f_warn, user, "Bad Channel Pressure message (invalid pressure "
 								"%02X) in track %d", pressure, track_i);
 							pressure ^= 0x80;
 						}
@@ -522,7 +523,7 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 					}
 					else if (msg >= 0xE0 && msg < 0xF0){ // Pitch Bend
 						if (p + 1 >= p_end){
-							warn(f_warn, warnuser, "Bad Pitch Bend message (out of data) in track "
+							warn(f_warn, user, "Bad Pitch Bend message (out of data) in track "
 								"%d", track_i);
 							goto mtrk_end;
 						}
@@ -530,12 +531,12 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 						int p1 = data[p++];
 						int p2 = data[p++];
 						if (p1 >= 0x80){
-							warn(f_warn, warnuser, "Bad Pitch Bend message (invalid lower bits "
+							warn(f_warn, user, "Bad Pitch Bend message (invalid lower bits "
 								"%02X) in track %d", p1, track_i);
 							p1 ^= 0x80;
 						}
 						if (p2 >= 0x80){
-							warn(f_warn, warnuser, "Bad Pitch Bend message (invalid higher bits "
+							warn(f_warn, user, "Bad Pitch Bend message (invalid higher bits "
 								"%02X) in track %d", p2, track_i);
 							p2 ^= 0x80;
 						}
@@ -548,13 +549,13 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 						int len = 0;
 						while (true){
 							if (p >= p_end){
-								warn(f_warn, warnuser, "Bad SysEx Event (out of data) in track %d",
+								warn(f_warn, user, "Bad SysEx Event (out of data) in track %d",
 									track_i);
 								goto mtrk_end;
 							}
 							len++;
 							if (len >= 5){
-								warn(f_warn, warnuser, "Bad SysEx Event (invalid data length) in "
+								warn(f_warn, user, "Bad SysEx Event (invalid data length) in "
 									"track %d", track_i);
 								goto mtrk_end;
 							}
@@ -567,7 +568,7 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 							}
 						}
 						if (p + dl > p_end){
-							warn(f_warn, warnuser, "Bad SysEx Event (data length too large) in "
+							warn(f_warn, user, "Bad SysEx Event (data length too large) in "
 								"track %d", track_i);
 							goto mtrk_end;
 						}
@@ -577,14 +578,14 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 					else if (msg == 0xFF){ // Meta Event
 						running_status = -1; // TODO: validate we should clear this
 						if (p + 1 >= p_end){
-							warn(f_warn, warnuser, "Bad Meta Event (out of data) in track %d",
+							warn(f_warn, user, "Bad Meta Event (out of data) in track %d",
 								track_i);
 							goto mtrk_end;
 						}
 						int type = data[p++];
 						int len = data[p++];
 						if (p + len > p_end){
-							warn(f_warn, warnuser, "Bad Meta Event (data length too large) in "
+							warn(f_warn, user, "Bad Meta Event (data length too large) in "
 								"track %d", track_i);
 							goto mtrk_end;
 						}
@@ -603,30 +604,30 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 								break;
 							case 0x2F: // 00                End of Track
 								if (len != 0){
-									warn(f_warn, warnuser, "Expecting zero-length data for End of "
+									warn(f_warn, user, "Expecting zero-length data for End of "
 										"Track message for track %d", track_i);
 								}
 								if (p < p_end){
 									uint64_t pd = p_end - p;
-									warn(f_warn, warnuser, "Extra data at end of track %d: %llu "
+									warn(f_warn, user, "Extra data at end of track %d: %llu "
 										"byte%s", track_i, pd, pd == 1 ? "" : "s");
 								}
 								goto mtrk_end;
 							case 0x51: // 03 TT TT TT       Set Tempo
 								if (len < 3){
-									warn(f_warn, warnuser, "Missing data for Set Tempo event in "
+									warn(f_warn, user, "Missing data for Set Tempo event in "
 										"track %d", track_i);
 								}
 								else{
 									if (len > 3){
-										warn(f_warn, warnuser, "Extra %d byte%s for Set Tempo "
+										warn(f_warn, user, "Extra %d byte%s for Set Tempo "
 											"event in track %d", len - 3, len - 3 == 1 ? "" : "s",
 											track_i);
 									}
 									int tempo = ((int)data[p + 0] << 16) | ((int)data[p + 1] << 8) |
 										data[p + 2];
 									if (tempo == 0){
-										warn(f_warn, warnuser, "Invalid tempo (0) for track %d",
+										warn(f_warn, user, "Invalid tempo (0) for track %d",
 											track_i);
 									}
 									else
@@ -637,12 +638,12 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 								break;
 							case 0x58: // 04 NN MM LL TT    Time Signature
 								if (len < 4){
-									warn(f_warn, warnuser, "Missing data for Time Signature event "
+									warn(f_warn, user, "Missing data for Time Signature event "
 										"in track %d", track_i);
 								}
 								else{
 									if (len > 4){
-										warn(f_warn, warnuser, "Extra %d byte%s for Time Signature "
+										warn(f_warn, user, "Extra %d byte%s for Time Signature "
 											"event in track %d", len - 4, len - 4 == 1 ? "" : "s",
 											track_i);
 									}
@@ -654,14 +655,14 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 							case 0x7F: // LL data           Sequencer-Specific Meta Event
 								break;
 							default:
-								warn(f_warn, warnuser, "Unknown Meta Event %02X in track %d",
+								warn(f_warn, user, "Unknown Meta Event %02X in track %d",
 									type, track_i);
 								break;
 						}
 						p += len;
 					}
 					else{
-						warn(f_warn, warnuser, "Unknown message type %02X in track %d",
+						warn(f_warn, user, "Unknown message type %02X in track %d",
 							msg, track_i);
 						goto mtrk_end;
 					}
@@ -681,11 +682,14 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 										midi->tracks[0] = ev_new;
 									}
 									else{
+										if (ev_insert && ev_insert->tick <= ev_new->tick)
+											here = ev_insert;
 										while (here->next && here->next->tick < ev_new->tick)
 											here = here->next;
 										// insert after here
 										ev_new->next = here->next;
 										here->next = ev_new;
+										ev_insert = ev_new;
 									}
 								}
 							}
@@ -694,28 +698,28 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_midi_warn_func f_warn
 							ev_last = (ev_last->next = ev_new);
 					}
 				}
-				warn(f_warn, warnuser, "Track %d ended before receiving End of Track message",
+				warn(f_warn, user, "Track %d ended before receiving End of Track message",
 					track_i);
 				mtrk_end:
 				track_i++;
 			} break;
 
 			case 2: { // XFIH
-				warn(f_warn, warnuser, "TODO: XFIH chunk not implemented");
+				warn(f_warn, user, "TODO: XFIH chunk not implemented");
 			} break;
 
 			case 3: { // XFKM
-				warn(f_warn, warnuser, "TODO: XFKM chunk not implemented");
+				warn(f_warn, user, "TODO: XFKM chunk not implemented");
 			} break;
 
 			default:
-				warn(f_warn, warnuser, "Fatal Error: Illegal Chunk Type");
+				warn(f_warn, user, "Fatal Error: Illegal Chunk Type");
 				exit(1);
 				return NULL;
 		}
 	}
 	if (found_header && track_chunks != track_i){
-		warn(f_warn, warnuser, "Mismatch between reported track count (%d) and actual track "
+		warn(f_warn, user, "Mismatch between reported track count (%d) and actual track "
 			"count (%d)", track_chunks, track_i);
 	}
 	return midi;
@@ -775,6 +779,25 @@ nm_ctx nm_ctx_new(nm_midi midi, int track, int samples_per_sec){
 	return ctx;
 }
 
+static inline float wave(float i){
+	// sine wave
+	//return sinf(M_PI * 2.0f * i);
+
+	i = fmodf(i, 1.0f);
+
+	// square wave
+	//if (i < 0.5f)
+	//	return -1.0f;
+	//return 1.0f;
+
+	// triangle wave
+	if (i < 0.25f)
+		return i * 4.0f;
+	else if (i < 0.75f)
+		return 2.0f - (i - 0.25f) * 4.0f;
+	return (i - 0.75f) * 4.0f - 1.0f;
+}
+
 static void render_sect(nm_ctx ctx, uint64_t samples_done, int len, nm_sample_st *samples){
 	memset(samples, 0, sizeof(nm_sample_st) * len);
 	for (int i = 0; i < ctx->midi->max_channels; i++){
@@ -796,7 +819,7 @@ static void render_sect(nm_ctx ctx, uint64_t samples_done, int len, nm_sample_st
 				float freq = ctx->chans[i].notes[n].freq;
 				for (int a = 0; a < len; a++){
 					float v = fade * fade * amp * amp *
-						sinf(M_PI * 2.0f * freq * (((double)samples_done) + a) / ctx->samples_per_sec);
+						wave(freq * (((double)samples_done) + a) / ctx->samples_per_sec);
 					if (fade < 1 && dfade > 0){
 						fade += dfade;
 						if (fade > 1)
