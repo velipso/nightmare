@@ -740,7 +740,72 @@ const char *nm_event_type_str(nm_event_type type){
 	return "Unknown";
 }
 
-nm_ctx nm_ctx_new(nm_midi midi, int track, int samples_per_sec){
+const char *nm_patch_str(nm_patch p){
+	switch (p){
+		#define X(en, code, str) case en: return str;
+		NM_EACH_PATCH(X)
+		#undef X
+		case NM__PATCH_END: break;
+	}
+	return "Unknown";
+}
+
+static int nm_patch_code(nm_patch p){
+	switch (p){
+		#define X(en, code, str) case en: return code;
+		NM_EACH_PATCH(X)
+		#undef X
+		case NM__PATCH_END: break;
+	}
+	return -1;
+}
+
+nm_patchcat nm_patch_category(nm_patch p){
+	if      (p >= NM_PIANO_ACGR   && p <= NM_PIANO_CLAV_PU ) return NM_PIANO;
+	else if (p >= NM_CHROM_CELE   && p <= NM_CHROM_DULC    ) return NM_CHROM;
+	else if (p >= NM_ORGAN_DRAW   && p <= NM_ORGAN_TANG    ) return NM_ORGAN;
+	else if (p >= NM_GUITAR_NYLO  && p <= NM_GUITAR_HARM_FB) return NM_GUITAR;
+	else if (p >= NM_BASS_ACOU    && p <= NM_BASS_SYN2_AP  ) return NM_BASS;
+	else if (p >= NM_STRING_VILN  && p <= NM_STRING_TIMP   ) return NM_STRING;
+	else if (p >= NM_ENSEM_STR1   && p <= NM_ENSEM_ORHI_EU ) return NM_ENSEM;
+	else if (p >= NM_BRASS_TRUM   && p <= NM_BRASS_SBR2_AN ) return NM_BRASS;
+	else if (p >= NM_REED_SOSA    && p <= NM_REED_CLAR     ) return NM_REED;
+	else if (p >= NM_PIPE_PICC    && p <= NM_PIPE_OCAR     ) return NM_PIPE;
+	else if (p >= NM_LEAD_OSC1    && p <= NM_LEAD_BALE_SW  ) return NM_LEAD;
+	else if (p >= NM_PAD_NEAG     && p <= NM_PAD_SWEE      ) return NM_PAD;
+	else if (p >= NM_SFX1_RAIN    && p <= NM_SFX1_SCFI     ) return NM_SFX1;
+	else if (p >= NM_ETHNIC_SITA  && p <= NM_ETHNIC_SHAN   ) return NM_ETHNIC;
+	else if (p >= NM_PERC_TIBE    && p <= NM_PERC_RECY     ) return NM_PERC;
+	else if (p >= NM_SFX2_G0_GUFR && p <= NM_SFX2_G7_EXPL  ) return NM_SFX2;
+	else if (p >= NM_PERSND_STAN  && p <= NM_PERSND_SNFX   ) return NM_PERSND;
+	return NM__PATCHCAT_END;
+}
+
+const char *nm_patchcat_str(nm_patchcat pc){
+	switch (pc){
+		case NM_PIANO : return "Piano";
+		case NM_CHROM : return "Chromatic Percussion";
+		case NM_ORGAN : return "Organ";
+		case NM_GUITAR: return "Guitar";
+		case NM_BASS  : return "Bass";
+		case NM_STRING: return "Strings & Orchestral";
+		case NM_ENSEM : return "Ensemble";
+		case NM_BRASS : return "Brass";
+		case NM_REED  : return "Reed";
+		case NM_PIPE  : return "Pipe";
+		case NM_LEAD  : return "Synth Lead";
+		case NM_PAD   : return "Synth Pad";
+		case NM_SFX1  : return "Sound Effects 1";
+		case NM_ETHNIC: return "Ethnic";
+		case NM_PERC  : return "Percussive";
+		case NM_SFX2  : return "Sound Effects 2";
+		case NM_PERSND: return "Percussion Sound Set";
+		case NM__PATCHCAT_END: break;
+	}
+	return "Unknown";
+}
+
+nm_ctx nm_ctx_new(nm_midi midi, int track, int voices, int samples_per_sec){
 	if (track < 0 || track >= midi->track_count)
 		return NULL;
 	nm_ctx ctx = nm_alloc(sizeof(nm_ctx_st));
@@ -761,41 +826,58 @@ nm_ctx nm_ctx_new(nm_midi midi, int track, int samples_per_sec){
 		ctx->chans[ch].pressure = 0;
 		ctx->chans[ch].pitch_bend = 0;
 		for (int nt = 0; nt < 128; nt++){
-			ctx->chans[ch].notes[nt].note = nt;
-			ctx->chans[ch].notes[nt].freq = 440.0 * pow(2.0, (nt - 69.0) / 12.0);
-			ctx->chans[ch].notes[nt].hit_velocity = 1;
-			ctx->chans[ch].notes[nt].hold_pressure = 1;
-			ctx->chans[ch].notes[nt].release_velocity = 1;
-			ctx->chans[ch].notes[nt].fade = 0;
-			ctx->chans[ch].notes[nt].dfade = 0;
-			ctx->chans[ch].notes[nt].hit = false;
-			ctx->chans[ch].notes[nt].down = false;
-			ctx->chans[ch].notes[nt].release = false;
+			nm_note_st *n = &ctx->chans[ch].notes[nt];
+			n->note = nt;
+			n->freq = 440.0 * pow(2.0, (nt - 69.0) / 12.0);
+			n->cycle_pos = 0;
+			n->dcycle_pos = 1.0f / ((float)samples_per_sec / (float)n->freq);
+			n->hit_velocity = 1;
+			n->hold_pressure = 1;
+			n->release_velocity = 1;
+			n->fade = 0;
+			n->dfade = 0;
+			n->hit = false;
+			n->down = false;
+			n->release = false;
 		}
 	}
+	nm_voice_st *last_voice = NULL;
+	for (int vi = 0; vi < voices; vi++){
+		nm_voice_st *v = nm_alloc(sizeof(nm_voice_st));
+		// TODO: init voice v
+		v->next = last_voice;
+		last_voice = v;
+	}
+	ctx->voice_free = last_voice;
+	ctx->voice_used = NULL;
 	for (int i = 0; i < 128; i++)
 		ctx->notedowns[i] = 0;
 	ctx->ev = midi->tracks[track];
 	return ctx;
 }
 
-static inline float wave(float i){
-	// sine wave
-	//return sinf(M_PI * 2.0f * i);
-
-	i = fmodf(i, 1.0f);
-
-	// square wave
-	//if (i < 0.5f)
-	//	return -1.0f;
-	//return 1.0f;
-
-	// triangle wave
+static inline float wave_sine  (float i){ return sinf(M_PI * 2.0f * i); }
+static inline float wave_saw   (float i){ return i;                     }
+static inline float wave_square(float i){ return i < 0.5f ? -1.0f : 1.0f; }
+static inline float wave_triangle(float i){
 	if (i < 0.25f)
 		return i * 4.0f;
 	else if (i < 0.75f)
 		return 2.0f - (i - 0.25f) * 4.0f;
 	return (i - 0.75f) * 4.0f - 1.0f;
+}
+
+static inline float wave(float i){
+	return wave_square(i);
+}
+
+static inline float wave_harmonic(float i, float a1, float a2, float a3, float a4){
+	float s0 = wave(i);
+	float s1 = wave(fmodf(2.0f * i, 1.0f));
+	float s2 = wave(fmodf(3.0f * i, 1.0f));
+	float s3 = wave(fmodf(4.0f * i, 1.0f));
+	float s4 = wave(fmodf(5.0f * i, 1.0f));
+	return s0 + a1 * s1 + a2 * s2 + a3 * s3 + a4 * s4;
 }
 
 static void render_sect(nm_ctx ctx, uint64_t samples_done, int len, nm_sample_st *samples){
@@ -804,36 +886,52 @@ static void render_sect(nm_ctx ctx, uint64_t samples_done, int len, nm_sample_st
 		for (int n = 0; n < 128; n++){
 			float fade = ctx->chans[i].notes[n].fade;
 			float dfade = ctx->chans[i].notes[n].dfade;
+			float attack = 0.001f;
+			float decay = 1.0f;
+			float sustain = 0.5f;
+			bool sustaining = ctx->chans[i].notes[n].down;
 			if (ctx->chans[i].notes[n].hit){
 				ctx->chans[i].notes[n].hit = false;
-				dfade = 1.0f / (0.03f * ctx->samples_per_sec);
+				dfade = 1.0f / (attack * ctx->samples_per_sec);
 				ctx->chans[i].notes[n].dfade = dfade;
 			}
 			else if (ctx->chans[i].notes[n].release){
 				ctx->chans[i].notes[n].release = false;
-				dfade = -1.0f / (0.1f * ctx->samples_per_sec);
+				dfade = -1.0f / (decay * ctx->samples_per_sec);
 				ctx->chans[i].notes[n].dfade = dfade;
 			}
 			if (fade > 0 || dfade > 0){
 				float amp = ctx->chans[i].notes[n].hit_velocity;
-				float freq = ctx->chans[i].notes[n].freq;
+				sustain *= amp;
+				float cycle_pos = ctx->chans[i].notes[n].cycle_pos;
+				float dcycle_pos = ctx->chans[i].notes[n].dcycle_pos;
 				for (int a = 0; a < len; a++){
-					float v = fade * fade * amp * amp *
-						wave(freq * (((double)samples_done) + a) / ctx->samples_per_sec);
-					if (fade < 1 && dfade > 0){
+					float v = fade * fade * 0.5f *
+						wave_harmonic(fmodf(cycle_pos + a * dcycle_pos, 1.0f),
+							9.0f / 15.0f,
+							4.0f / 15.0f,
+							2.0f / 15.0f,
+							1.0f / 15.0f
+						);
+					if ((i % 16) == 9) // mute GM1 drum channel TODO: this is a hack
+						v = 0;
+					if (dfade > 0){
 						fade += dfade;
-						if (fade > 1)
-							fade = 1;
+						if (fade >= amp){
+							dfade = -1.0f / (decay * ctx->samples_per_sec);
+							ctx->chans[i].notes[n].dfade = dfade;
+						}
 					}
-					else if (fade > 0 && dfade < 0){
+					else if (fade > 0 && (!sustaining || fade > sustain)){
 						fade += dfade;
-						if (fade < 0)
+						if (fade <= 0)
 							fade = 0;
 					}
 					samples[a].L += v;
 					samples[a].R += v;
 				}
 				ctx->chans[i].notes[n].fade = fade;
+				ctx->chans[i].notes[n].cycle_pos = fmodf(cycle_pos + len * dcycle_pos, 1.0);
 			}
 		}
 	}
@@ -925,6 +1023,18 @@ int nm_ctx_process(nm_ctx ctx, int sample_len, nm_sample_st *samples){
 }
 
 void nm_ctx_free(nm_ctx ctx){
+	nm_voice_st *here = ctx->voice_free;
+	while (here){
+		nm_voice_st *del = here;
+		here = here->next;
+		nm_free(del);
+	}
+	here = ctx->voice_used;
+	while (here){
+		nm_voice_st *del = here;
+		here = here->next;
+		nm_free(del);
+	}
 	nm_free(ctx->chans);
 	nm_free(ctx);
 }

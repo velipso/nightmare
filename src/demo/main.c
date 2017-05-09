@@ -130,6 +130,23 @@ int sdl_render_audio(void *data){
 	while (true){
 		SDL_SemWait(lock_write);
 		int sz = nm_ctx_process(ctx, sample_buffer_size, sample_buffer);
+		#ifndef NDEBUG
+		// crappy click detection
+		if (sz > 0){
+			float pL = sample_buffer[0].L;
+			float pR = sample_buffer[0].R;
+			for (int i = 1; i < sz; i++){
+				float nL = sample_buffer[i].L;
+				float nR = sample_buffer[i].R;
+				float dL = fabsf(nL - pL);
+				float dR = fabsf(nR - pR);
+				if (dL > 0.1f || dR > 0.1f)
+					printf("click!\n");
+				pL = nL;
+				pR = nR;
+			}
+		}
+		#endif
 		if (sz < sample_buffer_size){
 			memset(&sample_buffer[sz], 0, sizeof(nm_sample_st) * (sample_buffer_size - sz));
 			SDL_SemPost(lock_read);
@@ -172,18 +189,20 @@ int main(int argc, char **argv){
 	// f/For_Those_About_To_Rock.MID    // 0-size MTrk
 
 	// TODO:
-	//  pitch bends
+	//  voice based generation
+	//  pitch bends (coarse and fine grained)
 	//  understand control changes
 	//  synth plugins
 	//  drums
-	//  additive synth
+	//  poly mode
+	//  omni mode should perform all notes on/off because GM2 doesn't use omni mode
 
 	nm_midi midi = nm_midi_newfile(argv[1], midi_warn, NULL);
 	if (midi == NULL){
 		fprintf(stderr, "Failed to load MIDI file: %s\n", argv[1]);
 		return 1;
 	}
-	nm_ctx ctx = nm_ctx_new(midi, 0, 48000);
+	nm_ctx ctx = nm_ctx_new(midi, 0, 32, 48000);
 	if (ctx == NULL){
 		fprintf(stderr, "Out of memory\n");
 		return 1;
