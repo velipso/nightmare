@@ -367,15 +367,15 @@ One last note: there needs to be care taken when calculating timing because a MI
 the tempo or time signature during the middle of the song, which will change how ticks map to
 samples.
 
-Appendix: SysEx Manufactuerer Id Numbers
+Appendix: SysEx Manufacturer ID Numbers
 ========================================
 
-Assignment of an Id number requires payment to MIDI.org every year.  According to the website, those
-who stop paying have their Id's rescinded.  I'm not sure what that means from a technical
-standpoint - it doesn't look like the Id numbers are reallocated to new companies.  As of 2017, the
+Assignment of an ID number requires payment to MIDI.org every year.  According to the website, those
+who stop paying have their ID's rescinded.  I'm not sure what that means from a technical
+standpoint - it doesn't look like the ID numbers are reallocated to new companies.  As of 2017, the
 fee ranges from $500 to $20000 per year, depending on the size of the company.
 
-| Id         | Company                                                                            |
+| ID         | Company                                                                            |
 |------------|------------------------------------------------------------------------------------|
 | `00`       | Used for extensions, below                                                         |
 | `01`       | Sequential                                                                         |
@@ -623,20 +623,182 @@ fee ranges from $500 to $20000 per year, depending on the size of the company.
 | `00 00 72` | Woog Labs                                                                          |
 | `00 00 73` | Micropolis Corp                                                                    |
 | `00 00 74` | Ta Horng Musical Inst.                                                             |
-| `00 00 75` | eTek / Forte                                                                       |
+| `00 00 75` | eTek Labs / Forte Tech                                                             |
 | `00 00 76` | Electrovoice                                                                       |
-| `00 00 77` | Midisoft                                                                           |
-| `00 00 78` | Q-Sound Labs                                                                       |
+| `00 00 77` | Midisoft Corporation                                                               |
+| `00 00 78` | Q-Sound Labs (rescinded)                                                           |
 | `00 00 79` | Westrex                                                                            |
 | `00 00 7A` | NVidia                                                                             |
 | `00 00 7B` | ESS Technology                                                                     |
 | `00 00 7C` | MediaTrix Peripherals                                                              |
-| `00 00 7D` | Brooktree                                                                          |
-| `00 00 7E` | Otari                                                                              |
-| `00 00 7F` | Key Electronics                                                                    |
+| `00 00 7D` | Brooktree Corp                                                                     |
+| `00 00 7E` | Otari Corp                                                                         |
+| `00 00 7F` | Key Electronics, Inc.                                                              |
 | `00 00 80` | Crystalake Multimedia                                                              |
 | `00 00 81` | Crystal Semiconductor                                                              |
 | `00 00 82` | Rockwell Semiconductor                                                             |
+| --         | --                                                                                 |
+| `00 01 00` | Shure Incorporated                                                                 |
+| `00 01 01` | AuraSound                                                                          |
+| `00 01 02` | Crystal Semiconductor                                                              |
+| `00 01 03` | Conexant (Rockwell)                                                                |
+| `00 01 04` | Silicon Graphics                                                                   |
+| `00 01 05` | M-Audio (Midiman)                                                                  |
+| `00 01 06` | PreSonus                                                                           |
+| `00 01 07` | ?                                                                                  |
+| `00 01 08` | Topaz Enterprises                                                                  |
+| `00 01 09` | Cast Lighting                                                                      |
+| `00 01 0A` | Microsoft                                                                          |
+| `00 01 0B` | Sonic Foundry                                                                      |
+| `00 01 0C` | Line 6 (Fast Forward) (Yamaha)                                                     |
+| `00 01 0D` | Beatnik Inc                                                                        |
+| `00 01 0E` | Van Koevering Company                                                              |
+| `00 01 0F` | Altech Systems                                                                     |
+| `00 01 10` | S & S Research                                                                     |
+| `00 01 11` | VLSI Technology                                                                    |
+| `00 01 12` | Chromatic Research                                                                 |
+| `00 01 13` | Sapphire                                                                           |
+| `00 01 14` | IDRC                                                                               |
+| `00 01 15` | Justonic Tuning                                                                    |
+| `00 01 16` | TorComp Research Inc.                                                              |
+| `00 01 17` | Newtek Inc.                                                                        |
+| `00 01 18` | Sound Sculpture                                                                    |
+| `00 01 19` | Walker Technical                                                                   |
+| `00 01 1A` | Digital Harmony (PAVO)                                                             |
+| `00 01 1B` | InVision Interactive                                                               |
+| `00 01 1C` | T-Square Design                                                                    |
+| `00 01 1D` | Nemesys Music Technology                                                           |
+| `00 01 1E` | DBX Professional (Harman Intl)                                                     |
+| `00 01 1F` | Syndyne Corporation                                                                |
+| `00 01 20` | Bitheadz                                                                           |
+| `00 01 21` | Cakewalk Music Software (Gibson)                                                   |
+| `00 01 22` | Analog Devices                                                                     |
+| `00 01 23` | National Semiconductor                                                             |
+| `00 01 24` | Boom Theory / Adinolfi Alternative Percussion                                      |
+| `00 01 25` | Virtual DSP Corporation                                                            |
+| `00 01 26` | Antares Systems                                                                    |
+| `00 01 27` | Angel Software                                                                     |
+| `00 01 28` | St Louis Music                                                                     |
+| `00 01 29` | Passport Music Software LLC (Gvox) (rescinded)                                     |
+| `00 01 2A` | Ashley Audio Inc.                                                                  |
+| `00 01 2B` | Vari-Lite Inc.                                                                     |
+| `00 01 2C` | Summit Audio Inc.                                                                  |
+| `00 01 2D` | Aureal Semiconductor Inc.                                                          |
+| `00 01 2E` | SeaSound LLC                                                                       |
+| `00 01 2F` | U.S. Robotics                                                                      |
+| `00 01 30` | Aurisis Research                                                                   |
+| `00 01 31` | Nearfield Research                                                                 |
+| `00 01 32` | FM7 Inc                                                                            |
+| `00 01 33` | Swivel Systems                                                                     |
+| `00 01 34` | Hyperactive Audio Systems                                                          |
+| `00 01 35` | MidiLite (Castle Studios Productions)                                              |
+| `00 01 36` | Radikal Technologies                                                               |
+| `00 01 37` | Roger Linn Design (rescinded)                                                      |
+| `00 01 38` | TC-Helicon Vocal Technologies (rescinded)                                          |
+| `00 01 39` | Event Electronics (rescinded)                                                      |
+| `00 01 3A` | Sonic Network Inc                                                                  |
+| `00 01 3B` | Realtime Music Solutions (rescinded)                                               |
+| `00 01 3C` | Apogee Digital (rescinded)                                                         |
+| `00 01 3D` | Classical Organs, Inc. (rescinded)                                                 |
+| `00 01 3E` | Microtools Inc. (rescinded)                                                        |
+| `00 01 3F` | Numark Industries                                                                  |
+| `00 01 40` | Frontier Design Group, LLC                                                         |
+| `00 01 41` | Recordare LLC                                                                      |
+| `00 01 42` | Starr Labs (rescinded)                                                             |
+| `00 01 43` | Voyager Sound Inc.                                                                 |
+| `00 01 44` | Manifold Labs (rescinded)                                                          |
+| `00 01 45` | Aviom Inc. (rescinded)                                                             |
+| `00 01 46` | Mixmeister Technology                                                              |
+| `00 01 47` | Notation Software                                                                  |
+| `00 01 48` | Mercurial Communications                                                           |
+| `00 01 49` | Wave Arts                                                                          |
+| `00 01 4A` | Logic Sequencing Devices (rescinded)                                               |
+| `00 01 4B` | Axess Electronics                                                                  |
+| `00 01 4C` | Muse Research                                                                      |
+| `00 01 4D` | Open Labs (rescinded)                                                              |
+| `00 01 4E` | Guillemot Corp (rescinded)                                                         |
+| `00 01 4F` | Samson Technologies (rescinded)                                                    |
+| `00 01 50` | Electronic Theatre Controls                                                        |
+| `00 01 51` | Blackberry (RIM)                                                                   |
+| `00 01 52` | Mobileer                                                                           |
+| `00 01 53` | Synthogy                                                                           |
+| `00 01 54` | Lynx Studio Technology Inc.                                                        |
+| `00 01 55` | Damage Control Engineering LLC                                                     |
+| `00 01 56` | Yost Engineering, Inc. (rescinded)                                                 |
+| `00 01 57` | Brooks & Forsman Designs LLC / DrumLite                                            |
+| `00 01 58` | Infinite Response                                                                  |
+| `00 01 59` | Garritan Corp                                                                      |
+| `00 01 5A` | Plogue Art et Technologie, Inc (rescinded)                                         |
+| `00 01 5B` | RJM Music Technology                                                               |
+| `00 01 5C` | Custom Solutions Software                                                          |
+| `00 01 5D` | Sonarcana LLC / Highly Liquid                                                      |
+| `00 01 5E` | Centrance (rescinded)                                                              |
+| `00 01 5F` | Kesumo LLC                                                                         |
+| `00 01 60` | Stanton (Gibson)                                                                   |
+| `00 01 61` | Livid Instruments                                                                  |
+| `00 01 62` | First Act / 745 Media                                                              |
+| `00 01 63` | Pygraphics, Inc.                                                                   |
+| `00 01 64` | Panadigm Innovations Ltd                                                           |
+| `00 01 65` | Avedis Zildjian Co                                                                 |
+| `00 01 66` | Auvital Music Corp (rescinded)                                                     |
+| `00 01 67` | You Rock Guitar / Inspired Instruments (rescinded)                                 |
+| `00 01 68` | Chris Grigg Designs                                                                |
+| `00 01 69` | Slate Digital LLC                                                                  |
+| `00 01 6A` | Mixware  (rescinded)                                                               |
+| `00 01 6B` | Social Entropy                                                                     |
+| `00 01 6C` | Source Audio LLC                                                                   |
+| `00 01 6D` | Ernie Ball / Music Man                                                             |
+| `00 01 6E` | Fishman                                                                            |
+| `00 01 6F` | Custom Audio Electronics (rescinded)                                               |
+| `00 01 70` | American Audio/DJ                                                                  |
+| `00 01 71` | Mega Control Systems (rescinded)                                                   |
+| `00 01 72` | Kilpatrick Audio                                                                   |
+| `00 01 73` | iConnectivity                                                                      |
+| `00 01 74` | Fractal Audio                                                                      |
+| `00 01 75` | NetLogic Microsystems                                                              |
+| `00 01 76` | Music Computing                                                                    |
+| `00 01 77` | Nektar Technology Inc                                                              |
+| `00 01 78` | Zenph Sound Innovations                                                            |
+| `00 01 79` | DJTechTools.com (rescinded)                                                        |
+| `00 01 7A` | Rezonance Labs                                                                     |
+| `00 01 7B` | Decibel Eleven                                                                     |
+| `00 01 7C` | CNMAT (rescinded)                                                                  |
+| `00 01 7D` | Media Overkill                                                                     |
+| `00 01 7E` | Confusion Studios (rescinded)                                                      |
+| `00 01 7F` | moForte Inc                                                                        |
+| --         | --                                                                                 |
+| `00 02 00` | Miselu Inc                                                                         |
+| `00 02 01` | Amelia's Compass LLC                                                               |
+| `00 02 02` | Zivix LLC                                                                          |
+| `00 02 03` | Artiphon                                                                           |
+| `00 02 04` | Synclavier Digital                                                                 |
+| `00 02 05` | Light & Sound Control Devices LLC (rescinded)                                      |
+| `00 02 06` | Retronyms Inc                                                                      |
+| `00 02 07` | JS Technologies                                                                    |
+| `00 02 08` | Quicco Sound                                                                       |
+| `00 02 09` | A-Designs Audio                                                                    |
+| `00 02 0A` | McCarthy Music Corp (rescinded)                                                    |
+| `00 02 0B` | Denon DJ                                                                           |
+| `00 02 0C` | Keith Robert Murray                                                                |
+| `00 02 0D` | Google                                                                             |
+| `00 02 0E` | ISP Technologies                                                                   |
+| `00 02 0F` | Abstrakt Instruments LLC (rescinded)                                               |
+| `00 02 10` | Meris LLC                                                                          |
+| `00 02 11` | Sensorpoint LLC                                                                    |
+| `00 02 12` | Hi-Z Labs                                                                          |
+| `00 02 13` | Imitone                                                                            |
+| `00 02 14` | Intellijel Designs Inc.                                                            |
+| `00 02 15` | Dasz Instruments Inc.                                                              |
+| `00 02 16` | Remidi                                                                             |
+| `00 02 17` | Disaster Area Designs LLC                                                          |
+| `00 02 18` | Universal Audio                                                                    |
+| `00 02 19` | Carter Duncan Corp                                                                 |
+| `00 02 1A` | Essential Technology                                                               |
+| `00 02 1B` | Cantux Research LLC                                                                |
+| `00 02 1C` | Hummel Technologies                                                                |
+| `00 02 1D` | Sensel Inc                                                                         |
+| `00 02 1E` | DBML Group                                                                         |
+| `00 02 1F` | Madrona Labs                                                                       |
 | --         | --                                                                                 |
 | `00 20 00` | Dream SAS                                                                          |
 | `00 20 01` | Strand Lighting                                                                    |
@@ -679,9 +841,136 @@ fee ranges from $500 to $20000 per year, depending on the size of the company.
 | `00 20 26` | Penny and Giles (Bowthorpe PLC)                                                    |
 | `00 20 27` | Acorn Computer                                                                     |
 | `00 20 28` | LSC Electronics Pty. Ltd.                                                          |
-| `00 20 29` | Novation EMS                                                                       |
+| `00 20 29` | Focusrite / Novation EMS                                                           |
 | `00 20 2A` | Samkyung Mechatronics                                                              |
-| `00 20 2B` | Medeli Electronics                                                                 |
-| `00 20 2C` | Charlie Lab                                                                        |
+| `00 20 2B` | Medeli Electronics Co.                                                             |
+| `00 20 2C` | Charlie Lab SRL                                                                    |
 | `00 20 2D` | Blue Chip Music Tech                                                               |
 | `00 20 2E` | BEE OH Corp                                                                        |
+| `00 20 2F` | LG Semicon America                                                                 |
+| `00 20 30` | TESI                                                                               |
+| `00 20 31` | EMAGIC                                                                             |
+| `00 20 32` | Behringer GmbH                                                                     |
+| `00 20 33` | Access Music Electronics                                                           |
+| `00 20 34` | Synoptic                                                                           |
+| `00 20 35` | Hanmesoft                                                                          |
+| `00 20 36` | Terratec Electronic GmbH                                                           |
+| `00 20 37` | Proel SpA                                                                          |
+| `00 20 38` | IBK MIDI                                                                           |
+| `00 20 39` | IRCAM                                                                              |
+| `00 20 3A` | Propellerhead Software (rescinded)                                                 |
+| `00 20 3B` | Red Sound Systems Ltd                                                              |
+| `00 20 3C` | Elektron ESI AB                                                                    |
+| `00 20 3D` | Sintefex Audio                                                                     |
+| `00 20 3E` | MAM (Music and More)                                                               |
+| `00 20 3F` | Amsaro GmbH                                                                        |
+| `00 20 40` | CDS Advanced Technology BV (Lanbox) (rescinded)                                    |
+| `00 20 41` | Mode Machines (Touched By Sound GmbH)                                              |
+| `00 20 42` | DSP Arts                                                                           |
+| `00 20 43` | Phil Rees Music Tech                                                               |
+| `00 20 44` | Stamer Musikanlagen GmbH (rescinded)                                               |
+| `00 20 45` | Musical Muntaner S.A. dba Soundart                                                 |
+| `00 20 46` | C-Mexx Software (rescinded)                                                        |
+| `00 20 47` | Klavis Technologies                                                                |
+| `00 20 48` | Noteheads AB (rescinded)                                                           |
+| `00 20 49` | Algorithmix                                                                        |
+| `00 20 4A` | Skrydstrup R&D (rescinded)                                                         |
+| `00 20 4B` | Professional Audio Company                                                         |
+| `00 20 4C` | NewWave Labs (MadWaves)                                                            |
+| `00 20 4D` | Vermona (rescinded)                                                                |
+| `00 20 4E` | Nokia                                                                              |
+| `00 20 4F` | Wave Idea                                                                          |
+| `00 20 50` | Hartmann GmbH                                                                      |
+| `00 20 51` | Lion's Tracs (rescinded)                                                           |
+| `00 20 52` | Analogue Systems (rescinded)                                                       |
+| `00 20 53` | Focal-JMlab (rescinded)                                                            |
+| `00 20 54` | Ringway Electronics (Chang-Zhou) Co Ltd                                            |
+| `00 20 55` | Faith Technologies (Digiplug) (rescinded)                                          |
+| `00 20 56` | Showworks (rescinded)                                                              |
+| `00 20 57` | Manikin Electronic                                                                 |
+| `00 20 58` | 1 Come Tech                                                                        |
+| `00 20 59` | Phonic Corp (rescinded)                                                            |
+| `00 20 5A` | Dolby Australia (Lake)                                                             |
+| `00 20 5B` | Silansys Technologies (rescinded)                                                  |
+| `00 20 5C` | Winbond Electronics (rescinded)                                                    |
+| `00 20 5D` | Cinetix Medien und Interface GmbH                                                  |
+| `00 20 5E` | A&G Soluzioni Digitali                                                             |
+| `00 20 5F` | Sequentix Music Systems                                                            |
+| `00 20 60` | Oram Pro Audio (rescinded)                                                         |
+| `00 20 61` | Be4 Ltd (rescinded)                                                                |
+| `00 20 62` | Infection Music (rescinded)                                                        |
+| `00 20 63` | Central Music Co. (CME)                                                            |
+| `00 20 64` | genoQs Machines GmbH (rescinded)                                                   |
+| `00 20 65` | Medialon                                                                           |
+| `00 20 66` | Waves Audio Ltd                                                                    |
+| `00 20 67` | Jerash Labs (rescinded)                                                            |
+| `00 20 68` | Da Fact                                                                            |
+| `00 20 69` | Elby Designs                                                                       |
+| `00 20 6A` | Spectral Audio (rescinded)                                                         |
+| `00 20 6B` | Arturia                                                                            |
+| `00 20 6C` | Vixid (rescinded)                                                                  |
+| `00 20 6D` | C-Thru Music                                                                       |
+| `00 20 6E` | Ya Horng Electronic Co LTD                                                         |
+| `00 20 6F` | SM Pro Audio (rescinded)                                                           |
+| `00 20 70` | OTO MACHINES                                                                       |
+| `00 20 71` | ELZAB S.A. (G LAB) (rescinded)                                                     |
+| `00 20 72` | Blackstar Amplification Ltd                                                        |
+| `00 20 73` | M3i Technologies GmbH                                                              |
+| `00 20 74` | Gemalto (from Xiring) (rescinded)                                                  |
+| `00 20 75` | Prostage SL                                                                        |
+| `00 20 76` | Teenage Engineering                                                                |
+| `00 20 77` | Tobias Erichsen Consulting (rescinded)                                             |
+| `00 20 78` | Nixer Ltd (rescinded)                                                              |
+| `00 20 79` | Hanpin Electron Co Ltd                                                             |
+| `00 20 7A` | MIDI-hardware R.Sowa                                                               |
+| `00 20 7B` | Beyond Music Industrial Ltd                                                        |
+| `00 20 7C` | Kiss Box B.V.                                                                      |
+| `00 20 7D` | Misa Digital Technologies Ltd                                                      |
+| `00 20 7E` | AI Musics Technology Inc (rescinded)                                               |
+| `00 20 7F` | Serato Inc LP                                                                      |
+| --         | --                                                                                 |
+| `00 21 00` | Limex (rescinded)                                                                  |
+| `00 21 01` | Kyodday (Tokai) (rescinded)                                                        |
+| `00 21 02` | Mutable Instruments                                                                |
+| `00 21 03` | PreSonus Software Ltd                                                              |
+| `00 21 04` | Ingenico / Xiring                                                                  |
+| `00 21 05` | Fairlight Instruments Pty Ltd (rescinded)                                          |
+| `00 21 06` | Musicom Lab                                                                        |
+| `00 21 07` | Modal Electronics (Modulus/VacoLoco)                                               |
+| `00 21 08` | RWA (Hong Kong) Limited (rescinded)                                                |
+| `00 21 09` | Native Instruments                                                                 |
+| `00 21 0A` | Naonext                                                                            |
+| `00 21 0B` | MFB                                                                                |
+| `00 21 0C` | Teknel Research                                                                    |
+| `00 21 0D` | Ploytec GmbH                                                                       |
+| `00 21 0E` | Surfin Kangaroo Studio                                                             |
+| `00 21 0F` | Philips Electronics HK Ltd (rescinded)                                             |
+| `00 21 10` | ROLI Ltd                                                                           |
+| `00 21 11` | Panda-Audio Ltd                                                                    |
+| `00 21 12` | BauM Software                                                                      |
+| `00 21 13` | Machinewerks Ltd. (rescinded)                                                      |
+| `00 21 14` | Xiamen Elane Electronics (rescinded)                                               |
+| `00 21 15` | Marshall Amplification PLC                                                         |
+| `00 21 16` | Kiwitechnics Ltd                                                                   |
+| `00 21 17` | Rob Papen                                                                          |
+| `00 21 18` | Spicetone OU (rescinded)                                                           |
+| `00 21 19` | V3Sound                                                                            |
+| `00 21 1A` | IK Multimedia                                                                      |
+| `00 21 1B` | Novalia Ltd                                                                        |
+| `00 21 1C` | Modor Music                                                                        |
+| `00 21 1D` | Ableton                                                                            |
+| `00 21 1E` | Dtronics                                                                           |
+| `00 21 1F` | ZAQ Audio                                                                          |
+| `00 21 20` | Muabaobao Education Technology Co Ltd                                              |
+| `00 21 21` | Flux Effects                                                                       |
+| `00 21 22` | Audiothingies (MCDA)                                                               |
+| `00 21 23` | Retrokits                                                                          |
+| `00 21 24` | Morningstar FX Pte Ltd                                                             |
+| `00 21 25` | Hotone Audio                                                                       |
+| `00 21 26` | Expressive                                                                         |
+| `00 21 27` | Expert Sleepers Ltd                                                                |
+| `00 21 28` | Timecode-Vision Technology                                                         |
+| `00 21 29` | Hornberg Research GbR                                                              |
+| `00 21 2A` | Sonic Potions                                                                      |
+| `00 21 2B` | Audiofront                                                                         |
+| `00 21 2C` | Fred's Lab                                                                         |
