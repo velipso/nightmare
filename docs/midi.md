@@ -441,38 +441,38 @@ fee ranges from $500 to $20000 per year, depending on the size of the company.
 | `3D`       | Digigram                                                                           |
 | `3E`       | Waldorf Electronics GmbH                                                           |
 | `3F`       | Quasimidi                                                                          |
-| `40`       | Kawai                                                                              |
-| `41`       | Roland                                                                             |
-| `42`       | Korg                                                                               |
-| `43`       | Yamaha                                                                             |
-| `44`       | Casio                                                                              |
+| `40`       | Kawai Musical Instruments MFG. Co. Ltd.                                            |
+| `41`       | Roland Corporation                                                                 |
+| `42`       | Korg Inc.                                                                          |
+| `43`       | Yamaha Corporation                                                                 |
+| `44`       | Casio Computer Co. Ltd.                                                            |
 | `45`       | ?                                                                                  |
-| `46`       | Kamiya Studio                                                                      |
-| `47`       | Akai                                                                               |
-| `48`       | Japan Victor                                                                       |
+| `46`       | Kamiya Studio Co. Ltd.                                                             |
+| `47`       | Akai Electric Co. Ltd.                                                             |
+| `48`       | Victor Company of Japan Ltd.                                                       |
 | `49`       | Mesosha                                                                            |
 | `4A`       | Hoshino Gakki                                                                      |
-| `4B`       | Fujitsu Elect                                                                      |
-| `4C`       | Sony                                                                               |
+| `4B`       | Fujitsu Elect Ltd.                                                                 |
+| `4C`       | Sony Corporation                                                                   |
 | `4D`       | Nisshin Onpa                                                                       |
-| `4E`       | TEAC                                                                               |
+| `4E`       | Teac Corporation                                                                   |
 | `4F`       | ?                                                                                  |
-| `50`       | Matsushita Electric                                                                |
-| `51`       | Fostex                                                                             |
-| `52`       | Zoom                                                                               |
+| `50`       | Matsushita Electric Industrial Co. Ltd.                                            |
+| `51`       | Fostex Corporation                                                                 |
+| `52`       | Zoom Corporation                                                                   |
 | `53`       | Midori Electronics                                                                 |
-| `54`       | Matsushita Communication Industrial                                                |
-| `55`       | Suzuki Musical Inst. Mfg.                                                          |
-| `56`       | ?                                                                                  |
-| `57`       | ?                                                                                  |
+| `54`       | Matsushita Communication Industrial Co. Ltd.                                       |
+| `55`       | Suzuki Musical Instruments MFG. Co. Ltd.                                           |
+| `56`       | Fuji Sound Corporation Ltd.                                                        |
+| `57`       | Acoustic Technical Laboratory Inc.                                                 |
 | `58`       | ?                                                                                  |
-| `59`       | ?                                                                                  |
-| `5A`       | ?                                                                                  |
+| `59`       | Faith Inc.                                                                         |
+| `5A`       | Internet Corporation                                                               |
 | `5B`       | ?                                                                                  |
-| `5C`       | ?                                                                                  |
+| `5C`       | Seekers Co. Ltd.                                                                   |
 | `5D`       | ?                                                                                  |
 | `5E`       | ?                                                                                  |
-| `5F`       | ?                                                                                  |
+| `5F`       | SD Card Association                                                                |
 | `60`       | ?                                                                                  |
 | `61`       | ?                                                                                  |
 | `62`       | ?                                                                                  |
@@ -738,7 +738,7 @@ fee ranges from $500 to $20000 per year, depending on the size of the company.
 | `00 01 61` | Livid Instruments                                                                  |
 | `00 01 62` | First Act / 745 Media                                                              |
 | `00 01 63` | Pygraphics, Inc.                                                                   |
-| `00 01 64` | Panadigm Innovations Ltd                                                           |
+| `00 01 64` | Panadigm Innovations Ltd.                                                          |
 | `00 01 65` | Avedis Zildjian Co                                                                 |
 | `00 01 66` | Auvital Music Corp (rescinded)                                                     |
 | `00 01 67` | You Rock Guitar / Inspired Instruments (rescinded)                                 |
@@ -808,7 +808,7 @@ fee ranges from $500 to $20000 per year, depending on the size of the company.
 | `00 20 05` | Syntec Digital Audio (rescinded)                                                   |
 | `00 20 06` | Trident Audio Developments                                                         |
 | `00 20 07` | Real World Studio                                                                  |
-| `00 20 08` | Evolution Synthesis, Ltd (rescinded)                                               |
+| `00 20 08` | Evolution Synthesis, Ltd. (rescinded)                                              |
 | `00 20 09` | Yes Technology                                                                     |
 | `00 20 0A` | Audiomatica                                                                        |
 | `00 20 0B` | Bontempi SpA (Sigma) / Farfisa                                                     |
@@ -859,7 +859,7 @@ fee ranges from $500 to $20000 per year, depending on the size of the company.
 | `00 20 38` | IBK MIDI                                                                           |
 | `00 20 39` | IRCAM                                                                              |
 | `00 20 3A` | Propellerhead Software (rescinded)                                                 |
-| `00 20 3B` | Red Sound Systems Ltd                                                              |
+| `00 20 3B` | Red Sound Systems Ltd.                                                             |
 | `00 20 3C` | Elektron ESI AB                                                                    |
 | `00 20 3D` | Sintefex Audio                                                                     |
 | `00 20 3E` | MAM (Music and More)                                                               |
@@ -884,7 +884,7 @@ fee ranges from $500 to $20000 per year, depending on the size of the company.
 | `00 20 51` | Lion's Tracs (rescinded)                                                           |
 | `00 20 52` | Analogue Systems (rescinded)                                                       |
 | `00 20 53` | Focal-JMlab (rescinded)                                                            |
-| `00 20 54` | Ringway Electronics (Chang-Zhou) Co Ltd                                            |
+| `00 20 54` | Ringway Electronics (Chang-Zhou) Co. Ltd.                                          |
 | `00 20 55` | Faith Technologies (Digiplug) (rescinded)                                          |
 | `00 20 56` | Showworks (rescinded)                                                              |
 | `00 20 57` | Manikin Electronic                                                                 |
@@ -897,12 +897,12 @@ fee ranges from $500 to $20000 per year, depending on the size of the company.
 | `00 20 5E` | A&G Soluzioni Digitali                                                             |
 | `00 20 5F` | Sequentix Music Systems                                                            |
 | `00 20 60` | Oram Pro Audio (rescinded)                                                         |
-| `00 20 61` | Be4 Ltd (rescinded)                                                                |
+| `00 20 61` | Be4 Ltd. (rescinded)                                                               |
 | `00 20 62` | Infection Music (rescinded)                                                        |
 | `00 20 63` | Central Music Co. (CME)                                                            |
 | `00 20 64` | genoQs Machines GmbH (rescinded)                                                   |
 | `00 20 65` | Medialon                                                                           |
-| `00 20 66` | Waves Audio Ltd                                                                    |
+| `00 20 66` | Waves Audio Ltd.                                                                   |
 | `00 20 67` | Jerash Labs (rescinded)                                                            |
 | `00 20 68` | Da Fact                                                                            |
 | `00 20 69` | Elby Designs                                                                       |
@@ -910,31 +910,31 @@ fee ranges from $500 to $20000 per year, depending on the size of the company.
 | `00 20 6B` | Arturia                                                                            |
 | `00 20 6C` | Vixid (rescinded)                                                                  |
 | `00 20 6D` | C-Thru Music                                                                       |
-| `00 20 6E` | Ya Horng Electronic Co LTD                                                         |
+| `00 20 6E` | Ya Horng Electronic Co. Ltd.                                                       |
 | `00 20 6F` | SM Pro Audio (rescinded)                                                           |
 | `00 20 70` | OTO MACHINES                                                                       |
 | `00 20 71` | ELZAB S.A. (G LAB) (rescinded)                                                     |
-| `00 20 72` | Blackstar Amplification Ltd                                                        |
+| `00 20 72` | Blackstar Amplification Ltd.                                                       |
 | `00 20 73` | M3i Technologies GmbH                                                              |
 | `00 20 74` | Gemalto (from Xiring) (rescinded)                                                  |
 | `00 20 75` | Prostage SL                                                                        |
 | `00 20 76` | Teenage Engineering                                                                |
 | `00 20 77` | Tobias Erichsen Consulting (rescinded)                                             |
-| `00 20 78` | Nixer Ltd (rescinded)                                                              |
-| `00 20 79` | Hanpin Electron Co Ltd                                                             |
+| `00 20 78` | Nixer Ltd. (rescinded)                                                             |
+| `00 20 79` | Hanpin Electron Co. Ltd.                                                           |
 | `00 20 7A` | MIDI-hardware R.Sowa                                                               |
-| `00 20 7B` | Beyond Music Industrial Ltd                                                        |
+| `00 20 7B` | Beyond Music Industrial Ltd.                                                       |
 | `00 20 7C` | Kiss Box B.V.                                                                      |
-| `00 20 7D` | Misa Digital Technologies Ltd                                                      |
-| `00 20 7E` | AI Musics Technology Inc (rescinded)                                               |
-| `00 20 7F` | Serato Inc LP                                                                      |
+| `00 20 7D` | Misa Digital Technologies Ltd.                                                     |
+| `00 20 7E` | AI Musics Technology Inc. (rescinded)                                              |
+| `00 20 7F` | Serato Inc. LP                                                                     |
 | --         | --                                                                                 |
 | `00 21 00` | Limex (rescinded)                                                                  |
 | `00 21 01` | Kyodday (Tokai) (rescinded)                                                        |
 | `00 21 02` | Mutable Instruments                                                                |
-| `00 21 03` | PreSonus Software Ltd                                                              |
+| `00 21 03` | PreSonus Software Ltd.                                                             |
 | `00 21 04` | Ingenico / Xiring                                                                  |
-| `00 21 05` | Fairlight Instruments Pty Ltd (rescinded)                                          |
+| `00 21 05` | Fairlight Instruments Pty Ltd. (rescinded)                                         |
 | `00 21 06` | Musicom Lab                                                                        |
 | `00 21 07` | Modal Electronics (Modulus/VacoLoco)                                               |
 | `00 21 08` | RWA (Hong Kong) Limited (rescinded)                                                |
@@ -944,33 +944,38 @@ fee ranges from $500 to $20000 per year, depending on the size of the company.
 | `00 21 0C` | Teknel Research                                                                    |
 | `00 21 0D` | Ploytec GmbH                                                                       |
 | `00 21 0E` | Surfin Kangaroo Studio                                                             |
-| `00 21 0F` | Philips Electronics HK Ltd (rescinded)                                             |
-| `00 21 10` | ROLI Ltd                                                                           |
-| `00 21 11` | Panda-Audio Ltd                                                                    |
+| `00 21 0F` | Philips Electronics HK Ltd. (rescinded)                                            |
+| `00 21 10` | ROLI Ltd.                                                                          |
+| `00 21 11` | Panda-Audio Ltd.                                                                   |
 | `00 21 12` | BauM Software                                                                      |
 | `00 21 13` | Machinewerks Ltd. (rescinded)                                                      |
 | `00 21 14` | Xiamen Elane Electronics (rescinded)                                               |
 | `00 21 15` | Marshall Amplification PLC                                                         |
-| `00 21 16` | Kiwitechnics Ltd                                                                   |
+| `00 21 16` | Kiwitechnics Ltd.                                                                  |
 | `00 21 17` | Rob Papen                                                                          |
 | `00 21 18` | Spicetone OU (rescinded)                                                           |
 | `00 21 19` | V3Sound                                                                            |
 | `00 21 1A` | IK Multimedia                                                                      |
-| `00 21 1B` | Novalia Ltd                                                                        |
+| `00 21 1B` | Novalia Ltd.                                                                       |
 | `00 21 1C` | Modor Music                                                                        |
 | `00 21 1D` | Ableton                                                                            |
 | `00 21 1E` | Dtronics                                                                           |
 | `00 21 1F` | ZAQ Audio                                                                          |
-| `00 21 20` | Muabaobao Education Technology Co Ltd                                              |
+| `00 21 20` | Muabaobao Education Technology Co. Ltd.                                            |
 | `00 21 21` | Flux Effects                                                                       |
 | `00 21 22` | Audiothingies (MCDA)                                                               |
 | `00 21 23` | Retrokits                                                                          |
-| `00 21 24` | Morningstar FX Pte Ltd                                                             |
+| `00 21 24` | Morningstar FX Pte Ltd.                                                            |
 | `00 21 25` | Hotone Audio                                                                       |
 | `00 21 26` | Expressive                                                                         |
-| `00 21 27` | Expert Sleepers Ltd                                                                |
+| `00 21 27` | Expert Sleepers Ltd.                                                               |
 | `00 21 28` | Timecode-Vision Technology                                                         |
 | `00 21 29` | Hornberg Research GbR                                                              |
 | `00 21 2A` | Sonic Potions                                                                      |
 | `00 21 2B` | Audiofront                                                                         |
 | `00 21 2C` | Fred's Lab                                                                         |
+| --         | --                                                                                 |
+| `00 40 00` | Crimson Technology Inc.                                                            |
+| `00 40 01` | Audiofront                                                                         |
+| `00 40 02` | ?                                                                                  |
+| `00 40 03` | D&M Holdings Inc.                                                                  |
