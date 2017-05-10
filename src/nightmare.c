@@ -572,7 +572,26 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_warn_func f_warn, voi
 								"track %d", track_i);
 							goto mtrk_end;
 						}
-						// TODO: deal with SysEx event, deal with joining packets together
+						/*
+						if (data[p] == 0x7E){
+							printf("SysEx:");
+							for (int i = 0; i < dl; i++)
+								printf(" %02X", data[p + i]);
+							printf("\n");
+						}
+						else if (data[p] == 0x7F){
+							printf("SysEx RT:");
+							for (int i = 0; i < dl; i++)
+								printf(" %02X", data[p + i]);
+							printf("\n");
+						}
+						if (data[p + dl - 1] != 0xF7){
+							printf("SysEx Packeted:");
+							for (int i = 0; i < dl; i++)
+								printf(" %02X", data[p + i]);
+							printf("\n");
+						}
+						*/
 						p += dl;
 					}
 					else if (msg == 0xFF){ // Meta Event

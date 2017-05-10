@@ -82,20 +82,8 @@ void process_midi(const char *file){
 	did_warn = false;
 	printf("%s\n", &file[32]);
 	nm_midi midi = nm_midi_newfile(file, midi_warn, NULL);
-	for (int t = 0; t < midi->track_count; t++){
-		printf("Track %d\n", t + 1);
-		nm_event ev = midi->tracks[t];
-		while (ev){
-			if (ev->type == NM_NOTEON)
-				printf("%08llX Note On  %02X %g\n", ev->tick, ev->u.noteon.note, ev->u.noteon.velocity);
-			else if (ev->type == NM_NOTEOFF)
-				printf("%08llX Note Off %02X %g\n", ev->tick, ev->u.noteoff.note, ev->u.noteoff.velocity);
-			else
-				printf("%08llX %s\n", ev->tick, nm_event_type_str(ev->type));
-			ev = ev->next;
-		}
-	}
-	nm_midi_free(midi);
+	if (midi)
+		nm_midi_free(midi);
 	tot_all++;
 	if (did_warn)
 		tot_warn++;
@@ -180,10 +168,15 @@ int main(int argc, char **argv){
 	nm_free = db_free;
 	#endif
 
+//	each_midi("/Users/sean/Downloads/midi/data");
+//	return 0;
+
 	if (argc < 2){
 		printf("Usage: ./nightmare file.mid\n");
 		return 0;
 	}
+//	process_midi(argv[1]);
+//	return 0;
 
 	// z/Zelda3ocarina.mid              // very small and simple
 	// f/For_Those_About_To_Rock.MID    // 0-size MTrk

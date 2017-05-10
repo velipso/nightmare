@@ -312,7 +312,8 @@ TODO
 The MIDI specification has a lot of ways to represent timing.
 
 The unit of the Delta Timestamps is *ticks* passed since previous event.  But what is a *tick*?
-Specifically, we need to calculate *samples per tick*.
+Specifically, we need to calculate *samples per tick*, so that when we see how many ticks until the
+next event, we can move forward the appropriate amount of samples.
 
 The unit of the Division parameter in the header is *ticks per quarter-note*.
 
@@ -365,3 +366,322 @@ second) to figure out the *samples per tick*: Sample Rate /
 One last note: there needs to be care taken when calculating timing because a MIDI file can change
 the tempo or time signature during the middle of the song, which will change how ticks map to
 samples.
+
+Appendix: SysEx Manufactuerer Id Numbers
+========================================
+
+Assignment of an Id number requires payment to MIDI.org every year.  According to the website, those
+who stop paying have their Id's rescinded.  I'm not sure what that means from a technical
+standpoint - it doesn't look like the Id numbers are reallocated to new companies.  As of 2017, the
+fee ranges from $500 to $20000 per year, depending on the size of the company.
+
+| Id         | Company                                                                            |
+|------------|------------------------------------------------------------------------------------|
+| `00`       | Used for extensions, below                                                         |
+| `01`       | Sequential                                                                         |
+| `02`       | IDP                                                                                |
+| `03`       | Voyetra Turtle Beach, Inc. / Octave-Plateau                                        |
+| `04`       | Moog Music                                                                         |
+| `05`       | Passport Designs                                                                   |
+| `06`       | Lexicon Inc.                                                                       |
+| `07`       | Kurzweil / Young Chang                                                             |
+| `08`       | Fender                                                                             |
+| `09`       | MIDI9 / Gulbransen                                                                 |
+| `0A`       | AKG Acoustics                                                                      |
+| `0B`       | Voyce Music                                                                        |
+| `0C`       | Waveframe Corp (Timeline)                                                          |
+| `0D`       | ADA Signal Processors, Inc.                                                        |
+| `0E`       | Garfield Electronics                                                               |
+| `0F`       | Ensoniq                                                                            |
+| `10`       | Oberheim / Gibson Labs                                                             |
+| `11`       | Apple, Inc.                                                                        |
+| `12`       | Grey Matter Response                                                               |
+| `13`       | Digidesign Inc. (rescinded)                                                        |
+| `14`       | Palmtree Instruments                                                               |
+| `15`       | JLCooper Electronics                                                               |
+| `16`       | Lowrey Organ Company                                                               |
+| `17`       | Adams-Smith                                                                        |
+| `18`       | E-mu / Ensoniq                                                                     |
+| `19`       | Harmony Systems                                                                    |
+| `1A`       | ART                                                                                |
+| `1B`       | Baldwin                                                                            |
+| `1C`       | Eventide                                                                           |
+| `1D`       | Inventronics                                                                       |
+| `1E`       | Key Concepts (rescinded)                                                           |
+| `1F`       | Clarity                                                                            |
+| `20`       | Passac                                                                             |
+| `21`       | Proel Labs (SIEL)                                                                  |
+| `22`       | Synthaxe (UK)                                                                      |
+| `23`       | Stepp (rescinded)                                                                  |
+| `24`       | Hohner                                                                             |
+| `25`       | Twister                                                                            |
+| `26`       | Ketron s.r.l. / Solton                                                             |
+| `27`       | Jellinghaus MS                                                                     |
+| `28`       | Southworth Music Systems                                                           |
+| `29`       | PPG (Germany)                                                                      |
+| `2A`       | JEN                                                                                |
+| `2B`       | Solid State Logic Organ Systems / SSL Limited                                      |
+| `2C`       | Audio Veritrieb-P. Struven                                                         |
+| `2D`       | Neve (rescinded)                                                                   |
+| `2E`       | Soundtracs Ltd. (rescinded)                                                        |
+| `2F`       | Elka                                                                               |
+| `30`       | Dynacord                                                                           |
+| `31`       | Viscount International Spa (Intercontinental Electronics) (rescinded)              |
+| `32`       | Drawmer (rescinded)                                                                |
+| `33`       | Clavia Digital Instruments                                                         |
+| `34`       | Audio Architecture                                                                 |
+| `35`       | GeneralMusic Corp SpA                                                              |
+| `36`       | Cheetah Marketing (rescinded)                                                      |
+| `37`       | C.T.M. (rescinded)                                                                 |
+| `38`       | Simmons UK (rescinded)                                                             |
+| `39`       | Soundcraft Electronics                                                             |
+| `3A`       | Steinberg Media Technologies AG (rescinded)                                        |
+| `3B`       | Wersi Gmbh                                                                         |
+| `3C`       | AVAB Niethammer AB / Avab Electronik                                               |
+| `3D`       | Digigram                                                                           |
+| `3E`       | Waldorf Electronics GmbH                                                           |
+| `3F`       | Quasimidi                                                                          |
+| `40`       | Kawai                                                                              |
+| `41`       | Roland                                                                             |
+| `42`       | Korg                                                                               |
+| `43`       | Yamaha                                                                             |
+| `44`       | Casio                                                                              |
+| `45`       | ?                                                                                  |
+| `46`       | Kamiya Studio                                                                      |
+| `47`       | Akai                                                                               |
+| `48`       | Japan Victor                                                                       |
+| `49`       | Mesosha                                                                            |
+| `4A`       | Hoshino Gakki                                                                      |
+| `4B`       | Fujitsu Elect                                                                      |
+| `4C`       | Sony                                                                               |
+| `4D`       | Nisshin Onpa                                                                       |
+| `4E`       | TEAC                                                                               |
+| `4F`       | ?                                                                                  |
+| `50`       | Matsushita Electric                                                                |
+| `51`       | Fostex                                                                             |
+| `52`       | Zoom                                                                               |
+| `53`       | Midori Electronics                                                                 |
+| `54`       | Matsushita Communication Industrial                                                |
+| `55`       | Suzuki Musical Inst. Mfg.                                                          |
+| `56`       | ?                                                                                  |
+| `57`       | ?                                                                                  |
+| `58`       | ?                                                                                  |
+| `59`       | ?                                                                                  |
+| `5A`       | ?                                                                                  |
+| `5B`       | ?                                                                                  |
+| `5C`       | ?                                                                                  |
+| `5D`       | ?                                                                                  |
+| `5E`       | ?                                                                                  |
+| `5F`       | ?                                                                                  |
+| `60`       | ?                                                                                  |
+| `61`       | ?                                                                                  |
+| `62`       | ?                                                                                  |
+| `63`       | ?                                                                                  |
+| `64`       | ?                                                                                  |
+| `65`       | ?                                                                                  |
+| `66`       | ?                                                                                  |
+| `67`       | ?                                                                                  |
+| `68`       | ?                                                                                  |
+| `69`       | ?                                                                                  |
+| `6A`       | ?                                                                                  |
+| `6B`       | ?                                                                                  |
+| `6C`       | ?                                                                                  |
+| `6D`       | ?                                                                                  |
+| `6E`       | ?                                                                                  |
+| `6F`       | ?                                                                                  |
+| `70`       | ?                                                                                  |
+| `71`       | ?                                                                                  |
+| `72`       | ?                                                                                  |
+| `73`       | ?                                                                                  |
+| `74`       | ?                                                                                  |
+| `75`       | ?                                                                                  |
+| `76`       | ?                                                                                  |
+| `77`       | ?                                                                                  |
+| `78`       | ?                                                                                  |
+| `79`       | ?                                                                                  |
+| `7A`       | ?                                                                                  |
+| `7B`       | ?                                                                                  |
+| `7C`       | ?                                                                                  |
+| `7D`       | ?                                                                                  |
+| `7E`       | Reserved for Non-Real Time Universal SysEx Messages                                |
+| `7F`       | Reserved for Real Time Universal SysEx Messages                                    |
+| --         | --                                                                                 |
+| `00 00 00` | ?                                                                                  |
+| `00 00 01` | Time/Warner Interactive                                                            |
+| `00 00 02` | Advanced Gravis Comp. Tech Ltd. (rescinded)                                        |
+| `00 00 03` | Media Vision (rescinded)                                                           |
+| `00 00 04` | Dornes Research Group (rescinded)                                                  |
+| `00 00 05` | K-Muse (rescinded)                                                                 |
+| `00 00 06` | Stypher (rescinded)                                                                |
+| `00 00 07` | Digital Music Corp.                                                                |
+| `00 00 08` | IOTA Systems                                                                       |
+| `00 00 09` | New England Digital                                                                |
+| `00 00 0A` | Artisyn                                                                            |
+| `00 00 0B` | IVL Technologies Ltd.                                                              |
+| `00 00 0C` | Southern Music Systems                                                             |
+| `00 00 0D` | Lake Butler Sound Company                                                          |
+| `00 00 0E` | Alesis Studio Electronics                                                          |
+| `00 00 0F` | Sound Creation (rescinded)                                                         |
+| `00 00 10` | DOD Electronics Corp.                                                              |
+| `00 00 11` | Studer-Editech                                                                     |
+| `00 00 12` | Sonus (rescinded)                                                                  |
+| `00 00 13` | Temporal Acuity Products (rescinded)                                               |
+| `00 00 14` | Perfect Fretworks                                                                  |
+| `00 00 15` | KAT Inc.                                                                           |
+| `00 00 16` | Opcode Systems                                                                     |
+| `00 00 17` | Rane Corporation                                                                   |
+| `00 00 18` | Anadi Electronique                                                                 |
+| `00 00 19` | KMX                                                                                |
+| `00 00 1A` | Allen & Heath Brenell                                                              |
+| `00 00 1B` | Peavey Electronics                                                                 |
+| `00 00 1C` | 360 Systems                                                                        |
+| `00 00 1D` | Spectrum Design and Development                                                    |
+| `00 00 1E` | Marquis Music                                                                      |
+| `00 00 1F` | Zeta Systems                                                                       |
+| `00 00 20` | Axxes (Brian Parsonett)                                                            |
+| `00 00 21` | Orban                                                                              |
+| `00 00 22` | Indian Valley Mfg. (rescinded)                                                     |
+| `00 00 23` | Triton (rescinded)                                                                 |
+| `00 00 24` | KTI                                                                                |
+| `00 00 25` | Breakaway Technologies                                                             |
+| `00 00 26` | Leprecon / CAE Inc.                                                                |
+| `00 00 27` | Harrison Systems Inc. (rescinded)                                                  |
+| `00 00 28` | Future Lab/Mark Kuo (rescinded)                                                    |
+| `00 00 29` | Rocktron Corporation                                                               |
+| `00 00 2A` | PianoDisc                                                                          |
+| `00 00 2B` | Cannon Research Group                                                              |
+| `00 00 2C` | ?                                                                                  |
+| `00 00 2D` | Rodgers Instrument LLC                                                             |
+| `00 00 2E` | Blue Sky Logic                                                                     |
+| `00 00 2F` | Encore Electronics                                                                 |
+| `00 00 30` | Uptown                                                                             |
+| `00 00 31` | Voce                                                                               |
+| `00 00 32` | CTI Audio, Inc. (Musically Intel. Devs.)                                           |
+| `00 00 33` | S3 Incorporated                                                                    |
+| `00 00 34` | Broderbund / Red Orb                                                               |
+| `00 00 35` | Allen Organ Co.                                                                    |
+| `00 00 36` | ?                                                                                  |
+| `00 00 37` | Music Quest (rescinded)                                                            |
+| `00 00 38` | Aphex                                                                              |
+| `00 00 39` | Gallien Krueger                                                                    |
+| `00 00 3A` | IBM                                                                                |
+| `00 00 3B` | Mark Of The Unicorn                                                                |
+| `00 00 3C` | Hotz Corporation                                                                   |
+| `00 00 3D` | ETA Lighting                                                                       |
+| `00 00 3E` | NSI Corporation                                                                    |
+| `00 00 3F` | Ad Lib, Inc.                                                                       |
+| `00 00 40` | Richmond Sound Design                                                              |
+| `00 00 41` | Microsoft                                                                          |
+| `00 00 42` | Mindscape (Software Toolworks)                                                     |
+| `00 00 43` | Russ Jones Marketing / Niche                                                       |
+| `00 00 44` | Intone                                                                             |
+| `00 00 45` | Advanced Remote Technologies (rescinded)                                           |
+| `00 00 46` | White Instruments (rescinded)                                                      |
+| `00 00 47` | GT Electronics/Groove Tubes                                                        |
+| `00 00 48` | Pacific Research & Engineering (rescinded)                                         |
+| `00 00 49` | Timeline Vista, Inc.                                                               |
+| `00 00 4A` | Mesa Boogie Ltd.                                                                   |
+| `00 00 4B` | FSLI (rescinded)                                                                   |
+| `00 00 4C` | Sequoia Development Group                                                          |
+| `00 00 4D` | Studio Electronics                                                                 |
+| `00 00 4E` | Euphonix, Inc                                                                      |
+| `00 00 4F` | InterMIDI, Inc.                                                                    |
+| `00 00 50` | MIDI Solutions Inc.                                                                |
+| `00 00 51` | 3DO Company                                                                        |
+| `00 00 52` | Lightwave Research / High End Systems                                              |
+| `00 00 53` | Micro-W Corporation                                                                |
+| `00 00 54` | Spectral Synthesis, Inc.                                                           |
+| `00 00 55` | Lone Wolf                                                                          |
+| `00 00 56` | Studio Technologies Inc.                                                           |
+| `00 00 57` | Peterson Electro-Musical Product (EMP), Inc.                                       |
+| `00 00 58` | Atari Corporation                                                                  |
+| `00 00 59` | Marion Systems Corporation                                                         |
+| `00 00 5A` | Design Event                                                                       |
+| `00 00 5B` | Winjammer Software Ltd.                                                            |
+| `00 00 5C` | AT&T Bell Laboratories                                                             |
+| `00 00 5D` | ?                                                                                  |
+| `00 00 5E` | Symetrix                                                                           |
+| `00 00 5F` | MIDI the World                                                                     |
+| `00 00 60` | Spatializer / Desper Products                                                      |
+| `00 00 61` | Micros 'N MIDI                                                                     |
+| `00 00 62` | Accordians International                                                           |
+| `00 00 63` | 3Com / EuPhonics                                                                   |
+| `00 00 64` | Musonix                                                                            |
+| `00 00 65` | Turtle Beach Systems (Voyetra)                                                     |
+| `00 00 66` | Loud Technologies / Mackie Designs                                                 |
+| `00 00 67` | Compuserve                                                                         |
+| `00 00 68` | BEC Technologies                                                                   |
+| `00 00 69` | QRS Music Inc                                                                      |
+| `00 00 6A` | P.G. Music                                                                         |
+| `00 00 6B` | Sierra Semiconductor                                                               |
+| `00 00 6C` | EpiGraf Audio Visual                                                               |
+| `00 00 6D` | Electronics Diversified Inc                                                        |
+| `00 00 6E` | Tune 1000                                                                          |
+| `00 00 6F` | Advanced Micro Devices                                                             |
+| `00 00 70` | Mediamation                                                                        |
+| `00 00 71` | Sabine Musical Mfg. Co. Inc.                                                       |
+| `00 00 72` | Woog Labs                                                                          |
+| `00 00 73` | Micropolis Corp                                                                    |
+| `00 00 74` | Ta Horng Musical Inst.                                                             |
+| `00 00 75` | eTek / Forte                                                                       |
+| `00 00 76` | Electrovoice                                                                       |
+| `00 00 77` | Midisoft                                                                           |
+| `00 00 78` | Q-Sound Labs                                                                       |
+| `00 00 79` | Westrex                                                                            |
+| `00 00 7A` | NVidia                                                                             |
+| `00 00 7B` | ESS Technology                                                                     |
+| `00 00 7C` | MediaTrix Peripherals                                                              |
+| `00 00 7D` | Brooktree                                                                          |
+| `00 00 7E` | Otari                                                                              |
+| `00 00 7F` | Key Electronics                                                                    |
+| `00 00 80` | Crystalake Multimedia                                                              |
+| `00 00 81` | Crystal Semiconductor                                                              |
+| `00 00 82` | Rockwell Semiconductor                                                             |
+| --         | --                                                                                 |
+| `00 20 00` | Dream SAS                                                                          |
+| `00 20 01` | Strand Lighting                                                                    |
+| `00 20 02` | Amek Div of Harman Industries                                                      |
+| `00 20 03` | Casa Di Risparmio Di Loreto (rescinded)                                            |
+| `00 20 04` | Bohm Electronic GmbH                                                               |
+| `00 20 05` | Syntec Digital Audio (rescinded)                                                   |
+| `00 20 06` | Trident Audio Developments                                                         |
+| `00 20 07` | Real World Studio                                                                  |
+| `00 20 08` | Evolution Synthesis, Ltd (rescinded)                                               |
+| `00 20 09` | Yes Technology                                                                     |
+| `00 20 0A` | Audiomatica                                                                        |
+| `00 20 0B` | Bontempi SpA (Sigma) / Farfisa                                                     |
+| `00 20 0C` | F.B.T. Elettronica SpA                                                             |
+| `00 20 0D` | MidiTemp GmbH                                                                      |
+| `00 20 0E` | LA Audio (Larking Audio)                                                           |
+| `00 20 0F` | Zero 88 Lighting Limited                                                           |
+| `00 20 10` | Micon Audio Electronics GmbH                                                       |
+| `00 20 11` | Forefront Technology                                                               |
+| `00 20 12` | Studio Audio and Video Ltd. (rescinded)                                            |
+| `00 20 13` | Kenton Electronics                                                                 |
+| `00 20 14` | Celco / Electrosonic (rescinded)                                                   |
+| `00 20 15` | ADB                                                                                |
+| `00 20 16` | Marshall Products Limited                                                          |
+| `00 20 17` | DDA                                                                                |
+| `00 20 18` | BSS Audio Ltd.                                                                     |
+| `00 20 19` | MA Lighting Technology                                                             |
+| `00 20 1A` | Fatar SRL c/o Music Industries                                                     |
+| `00 20 1B` | QSC Audio Products Inc. (rescinded)                                                |
+| `00 20 1C` | Artisan Clasic Organ Inc.                                                          |
+| `00 20 1D` | Orla Spa                                                                           |
+| `00 20 1E` | Pinnacle Audio (Klark Teknik PLC)                                                  |
+| `00 20 1F` | TC Electronics                                                                     |
+| `00 20 20` | Doepfer Musikelektronik GmbH                                                       |
+| `00 20 21` | Creative ATC / E-mu                                                                |
+| `00 20 22` | Seyddo/Minami                                                                      |
+| `00 20 23` | LG Electronics / Goldstar                                                          |
+| `00 20 24` | Midisoft sas di M.Cima & C                                                         |
+| `00 20 25` | Samick Musical Inst. Co. Ltd.                                                      |
+| `00 20 26` | Penny and Giles (Bowthorpe PLC)                                                    |
+| `00 20 27` | Acorn Computer                                                                     |
+| `00 20 28` | LSC Electronics Pty. Ltd.                                                          |
+| `00 20 29` | Novation EMS                                                                       |
+| `00 20 2A` | Samkyung Mechatronics                                                              |
+| `00 20 2B` | Medeli Electronics                                                                 |
+| `00 20 2C` | Charlie Lab                                                                        |
+| `00 20 2D` | Blue Chip Music Tech                                                               |
+| `00 20 2E` | BEE OH Corp                                                                        |
