@@ -81,9 +81,7 @@ int tot_all = 0;
 void process_midi(const char *file){
 	did_warn = false;
 	printf("%s\n", &file[32]);
-	nm_midi midi = nm_midi_newfile(file, midi_warn, NULL);
-	if (midi)
-		nm_midi_free(midi);
+	// TODO: anything?
 	tot_all++;
 	if (did_warn)
 		tot_warn++;
@@ -117,7 +115,8 @@ int sdl_render_audio(void *data){
 	nm_ctx ctx = (nm_ctx)data;
 	while (true){
 		SDL_SemWait(lock_write);
-		int sz = nm_ctx_process(ctx, sample_buffer_size, sample_buffer);
+		memset(sample_buffer, 0, sizeof(nm_sample_st) * sample_buffer_size);
+		nm_ctx_process(ctx, sample_buffer_size, sample_buffer);
 		#ifndef NDEBUG
 		// crappy click detection
 		if (sz > 0){
@@ -135,13 +134,7 @@ int sdl_render_audio(void *data){
 			}
 		}
 		#endif
-		if (sz < sample_buffer_size){
-			memset(&sample_buffer[sz], 0, sizeof(nm_sample_st) * (sample_buffer_size - sz));
-			SDL_SemPost(lock_read);
-			break;
-		}
-		else
-			SDL_SemPost(lock_read);
+		SDL_SemPost(lock_read);
 	}
 	SDL_SemWait(lock_write);
 	render_done = true;
@@ -190,6 +183,15 @@ int main(int argc, char **argv){
 	//  poly mode
 	//  omni mode should perform all notes on/off because GM2 doesn't use omni mode
 
+	nm_ctx ctx = nm_ctx_new(480, 256, 32, 48000, NULL, 0, 0, NULL, NULL);
+	if (ctx == NULL){
+		fprintf(stderr, "Out of memory\n");
+		return 1;
+	}
+
+	nm_ctx_free(ctx);
+	return 0;
+#if 0
 	nm_midi midi = nm_midi_newfile(argv[1], midi_warn, NULL);
 	if (midi == NULL){
 		fprintf(stderr, "Failed to load MIDI file: %s\n", argv[1]);
@@ -249,4 +251,5 @@ int main(int argc, char **argv){
 	nm_ctx_free(ctx);
 	nm_midi_free(midi);
 	return 0;
+#endif
 }

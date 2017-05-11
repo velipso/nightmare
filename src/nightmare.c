@@ -9,9 +9,9 @@
 #include <assert.h>
 #include <string.h>
 
-nm_alloc_func nm_alloc = malloc;
+nm_alloc_func   nm_alloc   = malloc;
 nm_realloc_func nm_realloc = realloc;
-nm_free_func nm_free = free;
+nm_free_func    nm_free    = free;
 
 //     |----| attack
 // ___
@@ -23,7 +23,6 @@ nm_free_func nm_free = free;
 //
 //          |--|  +  |-|  decay
 static struct {
-	uint8_t wave;    // sine(0), saw(1), square(2), triangle(3)
 	float peak;      // max volume (0-1)
 	float attack;    // seconds
 	float decay;     // seconds
@@ -32,264 +31,375 @@ static struct {
 	float harmonic2; // 2nd, freq * 3
 	float harmonic3; // 3rd, freq * 4
 	float harmonic4; // 4th, freq * 5
+	uint8_t wave;    // sine(0), saw(1), square(2), triangle(3)
 } melodicpatch[256] = {
-	/* NM_PIANO_ACGR    */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_PIANO_ACGR_WI */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_PIANO_ACGR_DK */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_PIANO_BRAC    */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_PIANO_BRAC_WI */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_PIANO_ELGR    */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_PIANO_ELGR_WI */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_PIANO_HOTO    */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_PIANO_HOTO_WI */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_PIANO_ELE1    */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_PIANO_ELE1_DT */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_PIANO_ELE1_VM */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_PIANO_ELE1_60 */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_PIANO_ELE2    */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_PIANO_ELE2_DT */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_PIANO_ELE2_VM */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_PIANO_ELE2_LE */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_PIANO_ELE2_PH */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_PIANO_HARP    */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_PIANO_HARP_OM */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_PIANO_HARP_WI */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_PIANO_HARP_KO */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_PIANO_CLAV    */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_PIANO_CLAV_PU */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_CHROM_CELE    */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_CHROM_GLOC    */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_CHROM_MUBO    */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_CHROM_VIPH    */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_CHROM_VIPH_WI */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_CHROM_MARI    */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_CHROM_MARI_WI */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_CHROM_XYLO    */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_CHROM_BELL_TU */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_CHROM_BELL_CH */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_CHROM_BELL_CA */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_CHROM_DULC    */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_ORGAN_DRAW    */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_ORGAN_DRAW_DT */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_ORGAN_DRAW_60 */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_ORGAN_DRAW_AL */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_ORGAN_PERC    */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_ORGAN_PERC_DT */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_ORGAN_PERC_2  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_ORGAN_ROCK    */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_ORGAN_CHUR    */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_ORGAN_CHUR_OM */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_ORGAN_CHUR_DT */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_ORGAN_REED    */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_ORGAN_REED_PU */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_ORGAN_ACCO    */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_ORGAN_ACCO_2  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_ORGAN_HARM    */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_ORGAN_TANG    */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_GUITAR_NYLO   */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_GUITAR_NYLO_UK*/ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_GUITAR_NYLO_KO*/ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_GUITAR_NYLO_AL*/ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_GUITAR_STEE   */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_GUITAR_STEE_12*/ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_GUITAR_STEE_MA*/ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_GUITAR_STEE_BS*/ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_GUITAR_JAZZ   */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_GUITAR_JAZZ_PS*/ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_GUITAR_CLEA   */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_GUITAR_CLEA_DT*/ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_GUITAR_CLEA_MT*/ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_GUITAR_MUTE   */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_GUITAR_MUTE_FC*/ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_GUITAR_MUTE_VS*/ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_GUITAR_MUTE_JM*/ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_GUITAR_OVER   */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_GUITAR_OVER_PI*/ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_GUITAR_DIST   */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_GUITAR_DIST_FB*/ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_GUITAR_DIST_RH*/ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_GUITAR_HARM   */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_GUITAR_HARM_FB*/ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_BASS_ACOU     */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_BASS_FING     */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_BASS_FING_SL  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_BASS_PICK     */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_BASS_FRET     */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_BASS_SLP1     */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_BASS_SLP2     */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_BASS_SYN1     */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_BASS_SYN1_WA  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_BASS_SYN1_RE  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_BASS_SYN1_CL  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_BASS_SYN1_HA  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_BASS_SYN2     */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_BASS_SYN2_AT  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_BASS_SYN2_RU  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_BASS_SYN2_AP  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_STRING_VILN   */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_STRING_VILN_SA*/ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_STRING_VILA   */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_STRING_CELL   */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_STRING_CONT   */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_STRING_TREM   */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_STRING_PIZZ   */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_STRING_HARP   */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_STRING_HARP_YC*/ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_STRING_TIMP   */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_ENSEM_STR1    */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_ENSEM_STR1_SB */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_ENSEM_STR1_60 */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_ENSEM_STR2    */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_ENSEM_SYN1    */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_ENSEM_SYN1_AL */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_ENSEM_SYN2    */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_ENSEM_CHOI    */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_ENSEM_CHOI_AL */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_ENSEM_VOIC    */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_ENSEM_VOIC_HM */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_ENSEM_SYVO    */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_ENSEM_SYVO_AN */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_ENSEM_ORHI    */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_ENSEM_ORHI_BP */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_ENSEM_ORHI_6  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_ENSEM_ORHI_EU */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_BRASS_TRUM    */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_BRASS_TRUM_DS */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_BRASS_TROM    */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_BRASS_TROM_AL */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_BRASS_TROM_BR */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_BRASS_TUBA    */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_BRASS_MUTR    */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_BRASS_MUTR_AL */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_BRASS_FRHO    */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_BRASS_FRHO_WA */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_BRASS_BRSE    */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_BRASS_BRSE_OM */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_BRASS_SBR1    */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_BRASS_SBR1_AL */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_BRASS_SBR1_AN */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_BRASS_SBR1_JU */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_BRASS_SBR2    */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_BRASS_SBR2_AL */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_BRASS_SBR2_AN */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_REED_SOSA     */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_REED_ALSA     */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_REED_TESA     */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_REED_BASA     */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_REED_OBOE     */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_REED_ENHO     */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_REED_BASS     */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_REED_CLAR     */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_PIPE_PICC     */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_PIPE_FLUT     */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_PIPE_RECO     */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_PIPE_PAFL     */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_PIPE_BLBO     */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_PIPE_SHAK     */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_PIPE_WHIS     */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_PIPE_OCAR     */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_LEAD_OSC1     */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_LEAD_OSC1_SQ  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_LEAD_OSC1_SI  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_LEAD_OSC2     */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_LEAD_OSC2_SA  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_LEAD_OSC2_SP  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_LEAD_OSC2_DS  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_LEAD_OSC2_AN  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_LEAD_CALL     */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_LEAD_CHIF     */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_LEAD_CHAR     */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_LEAD_CHAR_WL  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_LEAD_VOIC     */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_LEAD_FIFT     */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_LEAD_BALE     */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_LEAD_BALE_SW  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_PAD_NEAG      */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_PAD_WARM      */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_PAD_WARM_SI   */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_PAD_POLY      */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_PAD_CHOI      */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_PAD_CHOI_IT   */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_PAD_BOWE      */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_PAD_META      */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_PAD_HALO      */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_PAD_SWEE      */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_SFX1_RAIN     */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_SFX1_SOTR     */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_SFX1_CRYS     */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_SFX1_CRYS_MA  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_SFX1_ATMO     */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_SFX1_BRIG     */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_SFX1_GOBL     */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_SFX1_ECHO     */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_SFX1_ECHO_BE  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_SFX1_ECHO_PA  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_SFX1_SCFI     */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_ETHNIC_SITA   */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_ETHNIC_SITA_BE*/ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_ETHNIC_BANJ   */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_ETHNIC_SHAM   */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_ETHNIC_KOTO   */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_ETHNIC_KOTO_TA*/ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_ETHNIC_KALI   */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_ETHNIC_BAPI   */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_ETHNIC_FIDD   */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_ETHNIC_SHAN   */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_PERC_TIBE     */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_PERC_AGOG     */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_PERC_STDR     */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_PERC_WOOD     */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_PERC_WOOD_CA  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_PERC_TADR     */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_PERC_TADR_CB  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_PERC_METO     */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_PERC_METO_PO  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_PERC_SYDR     */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_PERC_SYDR_RB  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_PERC_SYDR_EL  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_PERC_RECY     */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_SFX2_G0_GUFR  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_SFX2_G0_GUCU  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_SFX2_G0_STSL  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_SFX2_G1_BRNO  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_SFX2_G1_FLKC  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_SFX2_G2_SEAS  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_SFX2_G2_RAIN  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_SFX2_G2_THUN  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_SFX2_G2_WIND  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_SFX2_G2_STRE  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_SFX2_G2_BUBB  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_SFX2_G3_BTW1  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_SFX2_G3_DOG   */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_SFX2_G3_HOGA  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_SFX2_G3_BTW2  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_SFX2_G4_TEL1  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_SFX2_G4_TEL2  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_SFX2_G4_DOCR  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_SFX2_G4_DOOR  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_SFX2_G4_SCRA  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_SFX2_G4_WICH  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_SFX2_G5_HELI  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_SFX2_G5_CAEN  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_SFX2_G5_CAST  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_SFX2_G5_CAPA  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_SFX2_G5_CACR  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_SFX2_G5_SIRE  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_SFX2_G5_TRAI  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_SFX2_G5_JETP  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_SFX2_G5_STAR  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_SFX2_G5_BUNO  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_SFX2_G6_APPL  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_SFX2_G6_LAUG  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_SFX2_G6_SCRE  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_SFX2_G6_PUNC  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_SFX2_G6_HEBE  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_SFX2_G6_FOOT  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_SFX2_G7_GUSH  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_SFX2_G7_MAGU  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_SFX2_G7_LAGU  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
-	/* NM_SFX2_G7_EXPL  */ { 0, 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f },
+	/* NM_PIANO_ACGR    */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_PIANO_ACGR_WI */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_PIANO_ACGR_DK */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_PIANO_BRAC    */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_PIANO_BRAC_WI */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_PIANO_ELGR    */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_PIANO_ELGR_WI */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_PIANO_HOTO    */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_PIANO_HOTO_WI */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_PIANO_ELE1    */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_PIANO_ELE1_DT */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_PIANO_ELE1_VM */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_PIANO_ELE1_60 */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_PIANO_ELE2    */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_PIANO_ELE2_DT */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_PIANO_ELE2_VM */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_PIANO_ELE2_LE */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_PIANO_ELE2_PH */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_PIANO_HARP    */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_PIANO_HARP_OM */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_PIANO_HARP_WI */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_PIANO_HARP_KO */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_PIANO_CLAV    */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_PIANO_CLAV_PU */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_CHROM_CELE    */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_CHROM_GLOC    */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_CHROM_MUBO    */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_CHROM_VIPH    */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_CHROM_VIPH_WI */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_CHROM_MARI    */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_CHROM_MARI_WI */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_CHROM_XYLO    */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_CHROM_BELL_TU */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_CHROM_BELL_CH */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_CHROM_BELL_CA */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_CHROM_DULC    */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_ORGAN_DRAW    */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_ORGAN_DRAW_DT */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_ORGAN_DRAW_60 */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_ORGAN_DRAW_AL */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_ORGAN_PERC    */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_ORGAN_PERC_DT */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_ORGAN_PERC_2  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_ORGAN_ROCK    */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_ORGAN_CHUR    */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_ORGAN_CHUR_OM */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_ORGAN_CHUR_DT */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_ORGAN_REED    */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_ORGAN_REED_PU */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_ORGAN_ACCO    */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_ORGAN_ACCO_2  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_ORGAN_HARM    */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_ORGAN_TANG    */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_GUITAR_NYLO   */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_GUITAR_NYLO_UK*/ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_GUITAR_NYLO_KO*/ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_GUITAR_NYLO_AL*/ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_GUITAR_STEE   */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_GUITAR_STEE_12*/ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_GUITAR_STEE_MA*/ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_GUITAR_STEE_BS*/ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_GUITAR_JAZZ   */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_GUITAR_JAZZ_PS*/ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_GUITAR_CLEA   */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_GUITAR_CLEA_DT*/ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_GUITAR_CLEA_MT*/ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_GUITAR_MUTE   */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_GUITAR_MUTE_FC*/ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_GUITAR_MUTE_VS*/ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_GUITAR_MUTE_JM*/ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_GUITAR_OVER   */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_GUITAR_OVER_PI*/ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_GUITAR_DIST   */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_GUITAR_DIST_FB*/ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_GUITAR_DIST_RH*/ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_GUITAR_HARM   */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_GUITAR_HARM_FB*/ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_BASS_ACOU     */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_BASS_FING     */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_BASS_FING_SL  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_BASS_PICK     */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_BASS_FRET     */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_BASS_SLP1     */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_BASS_SLP2     */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_BASS_SYN1     */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_BASS_SYN1_WA  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_BASS_SYN1_RE  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_BASS_SYN1_CL  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_BASS_SYN1_HA  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_BASS_SYN2     */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_BASS_SYN2_AT  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_BASS_SYN2_RU  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_BASS_SYN2_AP  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_STRING_VILN   */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_STRING_VILN_SA*/ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_STRING_VILA   */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_STRING_CELL   */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_STRING_CONT   */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_STRING_TREM   */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_STRING_PIZZ   */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_STRING_HARP   */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_STRING_HARP_YC*/ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_STRING_TIMP   */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_ENSEM_STR1    */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_ENSEM_STR1_SB */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_ENSEM_STR1_60 */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_ENSEM_STR2    */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_ENSEM_SYN1    */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_ENSEM_SYN1_AL */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_ENSEM_SYN2    */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_ENSEM_CHOI    */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_ENSEM_CHOI_AL */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_ENSEM_VOIC    */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_ENSEM_VOIC_HM */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_ENSEM_SYVO    */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_ENSEM_SYVO_AN */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_ENSEM_ORHI    */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_ENSEM_ORHI_BP */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_ENSEM_ORHI_6  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_ENSEM_ORHI_EU */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_BRASS_TRUM    */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_BRASS_TRUM_DS */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_BRASS_TROM    */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_BRASS_TROM_AL */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_BRASS_TROM_BR */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_BRASS_TUBA    */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_BRASS_MUTR    */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_BRASS_MUTR_AL */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_BRASS_FRHO    */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_BRASS_FRHO_WA */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_BRASS_BRSE    */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_BRASS_BRSE_OM */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_BRASS_SBR1    */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_BRASS_SBR1_AL */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_BRASS_SBR1_AN */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_BRASS_SBR1_JU */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_BRASS_SBR2    */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_BRASS_SBR2_AL */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_BRASS_SBR2_AN */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_REED_SOSA     */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_REED_ALSA     */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_REED_TESA     */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_REED_BASA     */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_REED_OBOE     */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_REED_ENHO     */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_REED_BASS     */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_REED_CLAR     */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_PIPE_PICC     */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_PIPE_FLUT     */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_PIPE_RECO     */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_PIPE_PAFL     */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_PIPE_BLBO     */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_PIPE_SHAK     */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_PIPE_WHIS     */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_PIPE_OCAR     */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_LEAD_OSC1     */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_LEAD_OSC1_SQ  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_LEAD_OSC1_SI  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_LEAD_OSC2     */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_LEAD_OSC2_SA  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_LEAD_OSC2_SP  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_LEAD_OSC2_DS  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_LEAD_OSC2_AN  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_LEAD_CALL     */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_LEAD_CHIF     */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_LEAD_CHAR     */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_LEAD_CHAR_WL  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_LEAD_VOIC     */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_LEAD_FIFT     */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_LEAD_BALE     */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_LEAD_BALE_SW  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_PAD_NEAG      */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_PAD_WARM      */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_PAD_WARM_SI   */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_PAD_POLY      */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_PAD_CHOI      */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_PAD_CHOI_IT   */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_PAD_BOWE      */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_PAD_META      */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_PAD_HALO      */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_PAD_SWEE      */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_SFX1_RAIN     */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_SFX1_SOTR     */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_SFX1_CRYS     */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_SFX1_CRYS_MA  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_SFX1_ATMO     */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_SFX1_BRIG     */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_SFX1_GOBL     */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_SFX1_ECHO     */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_SFX1_ECHO_BE  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_SFX1_ECHO_PA  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_SFX1_SCFI     */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_ETHNIC_SITA   */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_ETHNIC_SITA_BE*/ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_ETHNIC_BANJ   */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_ETHNIC_SHAM   */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_ETHNIC_KOTO   */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_ETHNIC_KOTO_TA*/ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_ETHNIC_KALI   */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_ETHNIC_BAPI   */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_ETHNIC_FIDD   */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_ETHNIC_SHAN   */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_PERC_TIBE     */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_PERC_AGOG     */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_PERC_STDR     */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_PERC_WOOD     */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_PERC_WOOD_CA  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_PERC_TADR     */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_PERC_TADR_CB  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_PERC_METO     */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_PERC_METO_PO  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_PERC_SYDR     */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_PERC_SYDR_RB  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_PERC_SYDR_EL  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_PERC_RECY     */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_SFX2_G0_GUFR  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_SFX2_G0_GUCU  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_SFX2_G0_STSL  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_SFX2_G1_BRNO  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_SFX2_G1_FLKC  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_SFX2_G2_SEAS  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_SFX2_G2_RAIN  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_SFX2_G2_THUN  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_SFX2_G2_WIND  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_SFX2_G2_STRE  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_SFX2_G2_BUBB  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_SFX2_G3_BTW1  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_SFX2_G3_DOG   */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_SFX2_G3_HOGA  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_SFX2_G3_BTW2  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_SFX2_G4_TEL1  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_SFX2_G4_TEL2  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_SFX2_G4_DOCR  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_SFX2_G4_DOOR  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_SFX2_G4_SCRA  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_SFX2_G4_WICH  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_SFX2_G5_HELI  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_SFX2_G5_CAEN  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_SFX2_G5_CAST  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_SFX2_G5_CAPA  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_SFX2_G5_CACR  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_SFX2_G5_SIRE  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_SFX2_G5_TRAI  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_SFX2_G5_JETP  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_SFX2_G5_STAR  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_SFX2_G5_BUNO  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_SFX2_G6_APPL  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_SFX2_G6_LAUG  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_SFX2_G6_SCRE  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_SFX2_G6_PUNC  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_SFX2_G6_HEBE  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_SFX2_G6_FOOT  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_SFX2_G7_GUSH  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_SFX2_G7_MAGU  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_SFX2_G7_LAGU  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_SFX2_G7_EXPL  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
 };
+
+static inline void recalc_spt(nm_ctx ctx){
+	ctx->samples_per_tick =
+		((double)ctx->samples_per_sec * (double)ctx->usec_per_quarternote) /
+		(1000000.0 * (double)ctx->ticks_per_quarternote);
+}
+
+static inline void reset_tempo(nm_ctx ctx, uint16_t ticks_per_quarternote){
+	ctx->ticks_per_quarternote = ticks_per_quarternote;
+	ctx->usec_per_quarternote = 500000;
+	recalc_spt(ctx);
+}
+
+nm_ctx nm_ctx_new(uint16_t ticks_per_quarternote, uint16_t channels, int voices,
+	int samples_per_sec, void *synth, size_t sizeof_patchinf, size_t sizeof_voiceinf,
+	nm_synth_patch_setup_func f_patch_setup, nm_synth_render_func f_render){
+	nm_ctx ctx = nm_alloc(sizeof(nm_ctx_st));
+	if (ctx == NULL)
+		return NULL;
+
+	ctx->synth = synth;
+	ctx->f_patch_setup = f_patch_setup;
+	ctx->f_render = f_render;
+
+	ctx->ev_read = 0;
+	ctx->ev_write = 0;
+	ctx->ev_size = 200;
+	ctx->events = nm_alloc(sizeof(nm_event_st) * ctx->ev_size);
+	if (ctx->events == NULL){
+		nm_free(ctx);
+		return NULL;
+	}
+
+	ctx->wevents = NULL;
+	ctx->last_wevent = NULL;
+	ctx->ins_wevent = NULL;
+
+	ctx->samples_per_sec = samples_per_sec;
+	ctx->ticks = 0;
+	reset_tempo(ctx, ticks_per_quarternote);
+
+	ctx->channel_count = channels;
+	ctx->channels = nm_alloc(sizeof(nm_channel_st) * channels);
+	if (ctx->channels == NULL){
+		nm_free(ctx->events);
+		nm_free(ctx);
+		return NULL;
+	}
+	for (int i = 0; i < channels; i++){
+		ctx->channels[i].patch = NM_PIANO_ACGR; // TODO: what is proper intialization?
+		ctx->channels[i].mod = 0;
+		ctx->channels[i].bend = 0;
+	}
+
+	if (sizeof_voiceinf < sizeof(nm_defvoiceinf_st))
+		sizeof_voiceinf = sizeof(nm_defvoiceinf_st);
+	ctx->voices_free = NULL;
+	ctx->voices_used = NULL;
+	for (int i = 0; i < voices; i++){
+		nm_voice vc = nm_alloc(sizeof(nm_voice_st));
+		if (vc == NULL)
+			goto vc_cleanup;
+		vc->voiceinf = nm_alloc(sizeof_voiceinf);
+		if (vc->voiceinf == NULL){
+			nm_free(vc);
+			goto vc_cleanup;
+		}
+		vc->next = ctx->voices_free;
+		ctx->voices_free = vc;
+		continue;
+
+		vc_cleanup:
+		vc = ctx->voices_free;
+		while (vc){
+			nm_voice del = vc;
+			vc = vc->next;
+			nm_free(del->voiceinf);
+			nm_free(del);
+		}
+		nm_free(ctx->channels);
+		nm_free(ctx->events);
+		nm_free(ctx);
+		return NULL;
+	}
+
+	memset(ctx->patchinf_status, 0, sizeof(uint8_t) * NM__PATCH_END);
+
+	if (sizeof_patchinf < sizeof(nm_defpatchinf_st))
+		sizeof_patchinf = sizeof(nm_defpatchinf_st);
+	for (int i = 0; i < NM__PATCH_END; i++){
+		ctx->patchinf[i] = nm_alloc(sizeof_patchinf);
+		if (ctx->patchinf[i] == NULL){
+			for (int j = 0; j < i; j++)
+				nm_free(ctx->patchinf[j]);
+			nm_voice vc = ctx->voices_free;
+			while (vc){
+				nm_voice del = vc;
+				vc = vc->next;
+				nm_free(del->voiceinf);
+				nm_free(del);
+			}
+			nm_free(ctx->channels);
+			nm_free(ctx->events);
+			nm_free(ctx);
+			return NULL;
+		}
+	}
+
+	return ctx;
+}
 
 static void warn(nm_warn_func f_warn, void *user, const char *fmt, ...){
 	if (f_warn == NULL)
@@ -306,27 +416,27 @@ static void warn(nm_warn_func f_warn, void *user, const char *fmt, ...){
 	nm_free(buf);
 }
 
-nm_midi nm_midi_newfile(const char *file, nm_warn_func f_warn, void *user){
+bool nm_midi_newfile(nm_ctx ctx, const char *file, nm_warn_func f_warn, void *user){
 	FILE *fp = fopen(file, "rb");
 	if (fp == NULL)
-		return NULL;
+		return false;
 	fseek(fp, 0, SEEK_END);
 	uint64_t size = ftell(fp);
 	fseek(fp, 0, SEEK_SET);
 	uint8_t *data = nm_alloc(sizeof(uint8_t) * size);
 	if (data == NULL){
 		fclose(fp);
-		return NULL;
+		return false;
 	}
 	if (fread(data, 1, size, fp) != size){
 		nm_free(data);
 		fclose(fp);
-		return NULL;
+		return false;
 	}
 	fclose(fp);
-	nm_midi midi = nm_midi_newbuffer(size, data, f_warn, user);
+	bool res = nm_midi_newbuffer(ctx, size, data, f_warn, user);
 	nm_free(data);
-	return midi;
+	return res;
 }
 
 // -1 = invalid
@@ -388,179 +498,45 @@ static bool read_chunk(uint64_t p, uint64_t size, uint8_t *data, chunk_st *chk){
 	return true;
 }
 
-static inline nm_event ev_noteoff(uint64_t tick, int chan, uint8_t note, uint8_t vel){
-	nm_event ev = nm_alloc(sizeof(nm_event_st));
-	if (ev == NULL)
-		return NULL;
-	ev->next = NULL;
-	ev->type = NM_NOTEOFF;
-	ev->tick = tick;
-	ev->u.noteoff.channel = chan;
-	ev->u.noteoff.note = note;
-	if (vel == 0x40)
-		ev->u.noteoff.velocity = 0.5f;
-	else
-		ev->u.noteoff.velocity = (float)vel / 127.0f;
-	return ev;
+static inline const char *ss(int num){
+	return num == 1 ? "" : "s";
 }
 
-static inline nm_event ev_noteon(uint64_t tick, int chan, uint8_t note, uint8_t vel){
-	if (vel == 0)
-		return ev_noteoff(tick, chan, note, 0x40);
-	nm_event ev = nm_alloc(sizeof(nm_event_st));
-	if (ev == NULL)
-		return NULL;
-	ev->next = NULL;
-	ev->type = NM_NOTEON;
-	ev->tick = tick;
-	ev->u.noteon.channel = chan;
-	ev->u.noteon.note = note;
-	if (vel == 0x40)
-		ev->u.noteon.velocity = 0.5f;
-	else
-		ev->u.noteon.velocity = (float)vel / 127.0f;
-	return ev;
-}
-
-static inline nm_event ev_notepressure(uint64_t tick, int chan, uint8_t note, uint8_t pres){
-	nm_event ev = nm_alloc(sizeof(nm_event_st));
-	if (ev == NULL)
-		return NULL;
-	ev->next = NULL;
-	ev->type = NM_NOTEPRESSURE;
-	ev->tick = tick;
-	ev->u.notepressure.channel = chan;
-	ev->u.notepressure.note = note;
-	ev->u.notepressure.pressure = (float)pres / 127.0f; // TODO: not sure
-	return ev;
-}
-
-static inline nm_event ev_controlchange(uint64_t tick, int chan, uint8_t ctrl, uint8_t val){
-	nm_event ev = nm_alloc(sizeof(nm_event_st));
-	if (ev == NULL)
-		return NULL;
-	ev->next = NULL;
-	ev->type = NM_CONTROLCHANGE;
-	ev->tick = tick;
-	ev->u.controlchange.channel = chan;
-	ev->u.controlchange.control = ctrl;
-	ev->u.controlchange.value = val;
-	return ev;
-}
-
-static inline nm_event ev_programchange(uint64_t tick, int chan, uint8_t patch){
-	nm_event ev = nm_alloc(sizeof(nm_event_st));
-	if (ev == NULL)
-		return NULL;
-	ev->next = NULL;
-	ev->type = NM_PROGRAMCHANGE;
-	ev->tick = tick;
-	ev->u.programchange.channel = chan;
-	ev->u.programchange.patch = patch;
-	return ev;
-}
-
-static inline nm_event ev_channelpressure(uint64_t tick, int chan, uint8_t pres){
-	nm_event ev = nm_alloc(sizeof(nm_event_st));
-	if (ev == NULL)
-		return NULL;
-	ev->next = NULL;
-	ev->type = NM_CHANNELPRESSURE;
-	ev->tick = tick;
-	ev->u.channelpressure.channel = chan;
-	ev->u.channelpressure.pressure = (float)pres / 127.0f;
-	return ev;
-}
-
-static inline nm_event ev_pitchbend(uint64_t tick, int chan, uint16_t bend){
-	nm_event ev = nm_alloc(sizeof(nm_event_st));
-	if (ev == NULL)
-		return NULL;
-	ev->next = NULL;
-	ev->type = NM_PITCHBEND;
-	ev->tick = tick;
-	ev->u.pitchbend.channel = chan;
-	if (bend < 0x2000)
-		ev->u.pitchbend.bend = (float)(bend - 0x2000) / 8192.0f;
-	else if (bend == 0x2000)
-		ev->u.pitchbend.bend = 0;
-	else
-		ev->u.pitchbend.bend = (float)(bend - 0x2000) / 8191.0f;
-	return ev;
-}
-
-static inline nm_event ev_tempo(uint64_t tick, int tempo){
-	nm_event ev = nm_alloc(sizeof(nm_event_st));
-	if (ev == NULL)
-		return NULL;
-	ev->next = NULL;
-	ev->type = NM_TEMPO;
-	ev->tick = tick;
-	ev->u.tempo.tempo = tempo;
-	return ev;
-}
-
-static inline nm_event ev_timesig(uint64_t tick, int num, int den, int cc, int dd){
-	nm_event ev = nm_alloc(sizeof(nm_event_st));
-	if (ev == NULL)
-		return NULL;
-	ev->next = NULL;
-	ev->type = NM_TIMESIG;
-	ev->tick = tick;
-	ev->u.timesig.num = num;
-	ev->u.timesig.den = den;
-	ev->u.timesig.cc = cc;
-	ev->u.timesig.dd = dd;
-	return ev;
-}
-
-nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_warn_func f_warn, void *user){
+bool nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_warn, void *user){
 	if (size < 14 ||
 		data[0] != 'M' || data[1] != 'T' || data[2] != 'h' || data[3] != 'd' ||
 		data[4] !=  0  || data[5] !=  0  || data[6] !=  0  || data[7] < 6){
 		warn(f_warn, user, "Invalid header");
-		return NULL;
+		return false;
 	}
-	nm_midi midi = NULL;
 	uint64_t pos = 0;
+	uint32_t ticks = 0;
 	bool found_header = false;
-	int format;
-	int track_chunks;
+	bool ignore_timesig;
+	int hd_format;
+	int hd_track_ch;
+	uint16_t hd_ticks_per_q;
+	int track_count = 0;
+	int max_channels = 0;
 	int track_i = 0;
-	int tempo;
-	int timesig_num;
-	int timesig_den;
 	int running_status;
 	chunk_st chk;
 	while (pos < size){
 		if (!read_chunk(pos, size, data, &chk)){
-			if (midi == NULL)
+			if (!found_header){
 				warn(f_warn, user, "Invalid header");
-			else{
-				uint64_t dif = size - pos;
-				warn(f_warn, user, "Unrecognized data (%llu byte%s) at end of file", dif,
-					dif == 1 ? "" : "s");
+				return false;
 			}
-			return midi;
+			uint64_t dif = size - pos;
+			warn(f_warn, user, "Unrecognized data (%llu byte%s) at end of file", dif, ss(dif));
+			return true;
 		}
-		if (chk.alignment != 0){
-			warn(f_warn, user, "Chunk misaligned by %d byte%s", chk.alignment,
-				chk.alignment == 1 ? "" : "s");
-		}
-		if (midi == NULL){
-			midi = nm_alloc(sizeof(nm_midi_st));
-			if (midi == NULL)
-				return NULL;
-			midi->tracks = NULL;
-			midi->track_count = 0;
-			midi->ticks_per_q = 0;
-			midi->max_channels = 0;
-		}
+		if (chk.alignment != 0)
+			warn(f_warn, user, "Chunk misaligned by %d byte%s", chk.alignment, ss(chk.alignment));
 		uint64_t orig_size = chk.data_size;
 		if (chk.data_start + chk.data_size > size){
 			uint64_t offset = chk.data_start + chk.data_size - size;
-			warn(f_warn, user, "Chunk ends %llu byte%s too early",
-				offset, offset == 1 ? "" : "s");
+			warn(f_warn, user, "Chunk ends %llu byte%s too early", offset, ss(offset));
 			chk.data_size -= offset;
 		}
 		pos = chk.data_start + chk.data_size;
@@ -572,72 +548,68 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_warn_func f_warn, voi
 				if (orig_size != 6){
 					warn(f_warn, user,
 						"Header chunk has non-standard size %llu byte%s (expecting 6 bytes)",
-						orig_size, orig_size == 1 ? "" : "s");
+						orig_size, ss(orig_size));
 				}
 				if (chk.data_size >= 2){
-					format = ((int)data[chk.data_start + 0] << 8) | data[chk.data_start + 1];
-					if (format != 0 && format != 1 && format != 2){
-						warn(f_warn, user, "Header reports bad format (%d)", format);
-						format = 1;
+					hd_format = ((int)data[chk.data_start + 0] << 8) | data[chk.data_start + 1];
+					if (hd_format != 0 && hd_format != 1 && hd_format != 2){
+						warn(f_warn, user, "Header reports bad format (%d)", hd_format);
+						hd_format = 1;
 					}
 				}
 				else{
 					warn(f_warn, user, "Header missing format");
-					format = 1;
+					hd_format = 1;
 				}
 				if (chk.data_size >= 4){
-					track_chunks = ((int)data[chk.data_start + 2] << 8) | data[chk.data_start + 3];
-					if (format == 0 && track_chunks != 1){
+					hd_track_ch = ((int)data[chk.data_start + 2] << 8) | data[chk.data_start + 3];
+					if (hd_format == 0 && hd_track_ch != 1){
 						warn(f_warn, user,
 							"Format 0 expecting 1 track chunk, header is reporting %d chunks",
-							track_chunks);
+							hd_track_ch);
 					}
 				}
 				else{
 					warn(f_warn, user, "Header missing track chunk count");
-					track_chunks = -1;
+					hd_track_ch = -1;
 				}
 				if (chk.data_size >= 6){
-					int t = ((int)data[chk.data_start + 4] << 8) | data[chk.data_start + 5];
+					uint32_t t = ((int)data[chk.data_start + 4] << 8) | data[chk.data_start + 5];
 					if (t & 0x8000){
 						warn(f_warn, user, "Unsupported timing format (SMPTE)");
-						midi->ticks_per_q = 1;
+						hd_ticks_per_q = 1;
 					}
 					else
-						midi->ticks_per_q = t;
+						hd_ticks_per_q = t;
 				}
 				else{
 					warn(f_warn, user, "Header missing division");
-					midi->ticks_per_q = 1;
+					hd_ticks_per_q = 1;
 				}
 			} break;
 
 			case 1: { // MTrk
-				if (format == 0 && track_i > 0){
+				if (hd_format == 0 && track_i > 0){
 					warn(f_warn, user, "Format 0 expecting 1 track chunk, found more than one");
-					format = 1;
+					hd_format = 1;
 				}
 				int chan_base = 0;
-				if (track_i == 0 || format == 2){
-					tempo = 120;
-					timesig_num = 4;
-					timesig_den = 4;
-					midi->tracks = nm_realloc(midi->tracks, sizeof(nm_event) * (track_i + 1));
-					midi->tracks[track_i] = NULL;
-					midi->track_count = track_i + 1;
+				if (track_i == 0 || hd_format == 2){
+					ignore_timesig = false;
+					nm_ev_reset(ctx, ticks, hd_ticks_per_q);
 				}
-				if (format == 1)
+				if (hd_format == 1)
 					chan_base = track_i * 16;
-				midi->max_channels = chan_base + 16;
+				max_channels = chan_base + 16;
+				if (max_channels > 256){
+					warn(f_warn, user, "Too many simultaneous tracks, ignoring track %d", track_i);
+					goto mtrk_end;
+				}
 				running_status = -1;
 				uint64_t p = chk.data_start;
 				uint64_t p_end = chk.data_start + chk.data_size;
-				uint64_t tick = 0;
-				nm_event ev_last = NULL;
-				nm_event ev_insert = NULL;
 				while (p < p_end){
 					// read delta as variable int
-					nm_event ev_new = NULL;
 					int dt = 0;
 					int len = 0;
 					while (true){
@@ -662,7 +634,7 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_warn_func f_warn, voi
 						}
 					}
 
-					tick += dt;
+					ticks += dt;
 
 					if (p >= p_end){
 						warn(f_warn, user, "Missing message in track %d", track_i);
@@ -704,9 +676,9 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_warn_func f_warn, voi
 								"in track %d", vel, track_i);
 							vel ^= 0x80;
 						}
-						ev_new = ev_noteoff(tick, chan_base + (msg & 0xF), note, vel);
+						nm_ev_noteoff(ctx, ticks, chan_base + (msg & 0xF), note);
 					}
-					else if (msg >= 0x90 && msg < 0xA0){ // Note-On
+					else if (msg >= 0x90 && msg < 0xA0){ // Note On
 						if (p + 1 >= p_end){
 							warn(f_warn, user, "Bad Note-On message (out of data) in track %d",
 								track_i);
@@ -725,7 +697,8 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_warn_func f_warn, voi
 								"in track %d", vel, track_i);
 							vel ^= 0x80;
 						}
-						ev_new = ev_noteon(tick, chan_base + (msg & 0xF), note, vel);
+						nm_ev_noteon(ctx, ticks, chan_base + (msg & 0xF), note,
+							vel == 0x40 ? 0.5f : (float)vel / 127.0f);
 					}
 					else if (msg >= 0xA0 && msg < 0xB0){ // Note Pressure
 						if (p + 1 >= p_end){
@@ -746,7 +719,8 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_warn_func f_warn, voi
 								"%02X) in track %d", pressure, track_i);
 							pressure ^= 0x80;
 						}
-						ev_new = ev_notepressure(tick, chan_base + (msg & 0xF), note, pressure);
+						nm_ev_notemod(ctx, ticks, chan_base + (msg & 0xF), note,
+							pressure == 0x40 ? 0.5f : (float)pressure / 127.0f);
 					}
 					else if (msg >= 0xB0 && msg < 0xC0){ // Control Change
 						if (p + 1 >= p_end){
@@ -767,7 +741,7 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_warn_func f_warn, voi
 								"in track %d", val, track_i);
 							val ^= 0x80;
 						}
-						ev_new = ev_controlchange(tick, chan_base + (msg & 0xF), ctrl, val);
+						// TODO: deal with ctrl/val
 					}
 					else if (msg >= 0xC0 && msg < 0xD0){ // Program Change
 						if (p >= p_end){
@@ -782,7 +756,7 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_warn_func f_warn, voi
 								"%02X) in track %d", patch, track_i);
 							patch ^= 0x80;
 						}
-						ev_new = ev_programchange(tick, chan_base + (msg & 0xF), patch);
+						// TODO: deal with nm_ev_patch (mapping patch+bank to nm_patch)
 					}
 					else if (msg >= 0xD0 && msg < 0xE0){ // Channel Pressure
 						if (p >= p_end){
@@ -797,7 +771,8 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_warn_func f_warn, voi
 								"%02X) in track %d", pressure, track_i);
 							pressure ^= 0x80;
 						}
-						ev_new = ev_channelpressure(tick, chan_base + (msg & 0xF), pressure);
+						nm_ev_chanmod(ctx, ticks, chan_base + (msg & 0xF),
+							pressure == 0x40 ? 0.5f : (float)pressure / 127.0f);
 					}
 					else if (msg >= 0xE0 && msg < 0xF0){ // Pitch Bend
 						if (p + 1 >= p_end){
@@ -818,7 +793,15 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_warn_func f_warn, voi
 								"%02X) in track %d", p2, track_i);
 							p2 ^= 0x80;
 						}
-						ev_new = ev_pitchbend(tick, chan_base + (msg & 0xF), p1 | (p2 << 7));
+						uint16_t bend = p1 | (p2 << 7);
+						float bendf;
+						if (bend < 0x2000)
+							bendf = (float)(bend - 0x2000) / 8192.0f;
+						else if (bend == 0x2000)
+							bendf = 0;
+						else
+							bendf = (float)(bend - 0x2000) / 8191.0f;
+						nm_ev_chanbend(ctx, ticks, chan_base + (msg & 0xF), bendf);
 					}
 					else if (msg == 0xF0 || msg == 0xF7){ // SysEx Event
 						running_status = -1; // TODO: validate we should clear this
@@ -927,8 +910,10 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_warn_func f_warn, voi
 										warn(f_warn, user, "Invalid tempo (0) for track %d",
 											track_i);
 									}
-									else
-										ev_new = ev_tempo(tick, tempo);
+									else{
+										ignore_timesig = true;
+										nm_ev_tempo(ctx, ticks, tempo);
+									}
 								}
 								break;
 							case 0x54: // 05 HH MM SS RR TT SMPTE Offset
@@ -944,8 +929,10 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_warn_func f_warn, voi
 											"event in track %d", len - 4, len - 4 == 1 ? "" : "s",
 											track_i);
 									}
-									ev_new = ev_timesig(tick,
-										data[p], data[p + 1], data[p + 2], data[p + 3]);
+									if (!ignore_timesig){
+										nm_ev_tempo(ctx, ticks, (uint32_t)
+											(1000000.0f / powf(2.0f, 3.0f - data[p + 1])));
+									}
 								}
 								break;
 							case 0x59: // 02 SS MM          Key Signature
@@ -963,37 +950,6 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_warn_func f_warn, voi
 							msg, track_i);
 						goto mtrk_end;
 					}
-					if (ev_new){
-						if (ev_last == NULL){
-							if (format == 2)
-								midi->tracks[track_i] = (ev_last = ev_new);
-							else{
-								// insert ev_new into tracks[0]
-								if (midi->tracks[0] == NULL)
-									midi->tracks[0] = ev_new;
-								else{
-									nm_event here = midi->tracks[0];
-									if (ev_new->tick < here->tick){
-										// insert at start
-										ev_new->next = here;
-										midi->tracks[0] = ev_new;
-									}
-									else{
-										if (ev_insert && ev_insert->tick <= ev_new->tick)
-											here = ev_insert;
-										while (here->next && here->next->tick < ev_new->tick)
-											here = here->next;
-										// insert after here
-										ev_new->next = here->next;
-										here->next = ev_new;
-										ev_insert = ev_new;
-									}
-								}
-							}
-						}
-						else
-							ev_last = (ev_last->next = ev_new);
-					}
 				}
 				warn(f_warn, user, "Track %d ended before receiving End of Track message",
 					track_i);
@@ -1001,40 +957,21 @@ nm_midi nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_warn_func f_warn, voi
 				track_i++;
 			} break;
 
-			case 2: { // XFIH
-				warn(f_warn, user, "TODO: XFIH chunk not implemented");
-			} break;
-
-			case 3: { // XFKM
-				warn(f_warn, user, "TODO: XFKM chunk not implemented");
-			} break;
+			case 2: // XFIH
+			case 3: // XFKM
+				break;
 
 			default:
 				warn(f_warn, user, "Fatal Error: Illegal Chunk Type");
 				exit(1);
-				return NULL;
+				return false;
 		}
 	}
-	if (found_header && track_chunks != track_i){
+	if (found_header && hd_track_ch != track_i){
 		warn(f_warn, user, "Mismatch between reported track count (%d) and actual track "
-			"count (%d)", track_chunks, track_i);
+			"count (%d)", hd_track_ch, track_i);
 	}
-	return midi;
-}
-
-const char *nm_event_type_str(nm_event_type type){
-	switch (type){
-		case NM_NOTEOFF:         return "Note Off";
-		case NM_NOTEON:          return "Note On";
-		case NM_NOTEPRESSURE:    return "Note Pressure";
-		case NM_CONTROLCHANGE:   return "Control Change";
-		case NM_PROGRAMCHANGE:   return "Program Change";
-		case NM_CHANNELPRESSURE: return "Channel Pressure";
-		case NM_PITCHBEND:       return "Pitch Bend";
-		case NM_TEMPO:           return "Tempo";
-		case NM_TIMESIG:         return "Time Signature";
-	}
-	return "Unknown";
+	return true;
 }
 
 const char *nm_patch_str(nm_patch p){
@@ -1102,61 +1039,40 @@ const char *nm_patchcat_str(nm_patchcat pc){
 	return "Unknown";
 }
 
-nm_ctx nm_ctx_new(nm_midi midi, int track, int voices, int samples_per_sec){
-	if (track < 0 || track >= midi->track_count)
-		return NULL;
-	nm_ctx ctx = nm_alloc(sizeof(nm_ctx_st));
-	if (ctx == NULL)
-		return NULL;
-	ctx->midi = midi;
-	ctx->ticks = 0;
-	ctx->samples_done = 0;
-	ctx->samples_per_tick = (double)samples_per_sec / ((double)midi->ticks_per_q * 2.0);
-	ctx->samples_per_sec = samples_per_sec;
-	ctx->ignore_timesig = false;
-	ctx->chans = nm_alloc(sizeof(nm_channel_st) * midi->max_channels);
-	if (ctx->chans == NULL){
-		nm_free(ctx);
-		return NULL;
-	}
-	for (int ch = 0; ch < midi->max_channels; ch++){
-		ctx->chans[ch].pressure = 0;
-		ctx->chans[ch].pitch_bend = 0;
-		for (int nt = 0; nt < 128; nt++){
-			nm_note_st *n = &ctx->chans[ch].notes[nt];
-			n->note = nt;
-			n->freq = 440.0f * powf(2.0f, ((float)nt - 69.0f) / 12.0f);
-			n->cycle_pos = 0;
-			n->dcycle_pos = 1.0f / ((float)samples_per_sec / (float)n->freq);
-			n->hit_velocity = 1;
-			n->hold_pressure = 1;
-			n->release_velocity = 1;
-			n->fade = 0;
-			n->dfade = 0;
-			n->hit = false;
-			n->down = false;
-			n->release = false;
-		}
-	}
-	nm_voice_st *last_voice = NULL;
-	for (int vi = 0; vi < voices; vi++){
-		nm_voice_st *v = nm_alloc(sizeof(nm_voice_st));
-		// TODO: init voice v
-		v->next = last_voice;
-		last_voice = v;
-	}
-	ctx->voice_free = last_voice;
-	ctx->voice_used = NULL;
-	for (int i = 0; i < 128; i++)
-		ctx->notedowns[i] = 0;
-	ctx->ev = midi->tracks[track];
-	return ctx;
+void nm_ev_reset(nm_ctx ctx, uint32_t tick, uint16_t ticks_per_quarternote){
 }
 
-static inline float wave_sine  (float i){ return sinf(M_PI * 2.0f * i); }
-static inline float wave_saw   (float i){ return i;                     }
-static inline float wave_square(float i){ return i < 0.5f ? -1.0f : 1.0f; }
-static inline float wave_triangle(float i){
+void nm_ev_noteon(nm_ctx ctx, uint32_t tick, uint16_t channel, uint8_t note, float vel){
+}
+
+void nm_ev_notemod(nm_ctx ctx, uint32_t tick, uint16_t channel, uint8_t note, float mod){
+}
+
+void nm_ev_noteoff(nm_ctx ctx, uint32_t tick, uint16_t channel, uint8_t note){
+}
+
+void nm_ev_chanmod(nm_ctx ctx, uint32_t tick, uint16_t channel, float mod){
+}
+
+void nm_ev_chanbend(nm_ctx ctx, uint32_t tick, uint16_t channel, float bend){
+}
+
+void nm_ev_tempo(nm_ctx ctx, uint32_t tick, uint32_t usec_per_quarternote){
+}
+
+void nm_ev_patch(nm_ctx ctx, uint32_t tick, uint16_t channel, nm_patch patch){
+}
+
+void nm_ctx_bake(nm_ctx ctx, uint32_t ticks){
+}
+
+void nm_ctx_clear(nm_ctx ctx){
+}
+
+static float wave_sine  (float i){ return sinf(M_PI * 2.0f * i); }
+static float wave_saw   (float i){ return i;                     }
+static float wave_square(float i){ return i < 0.5f ? -1.0f : 1.0f; }
+static float wave_triangle(float i){
 	if (i < 0.25f)
 		return i * 4.0f;
 	else if (i < 0.75f)
@@ -1164,59 +1080,61 @@ static inline float wave_triangle(float i){
 	return (i - 0.75f) * 4.0f - 1.0f;
 }
 
-static inline float wave(float i){
-	return wave_square(i);
+static inline float wave_harmonic(float i, float h1, float h2, float h3, float h4,
+	float (*f_wave)(float i)){
+	float s0 = f_wave(i);
+	float s1 = f_wave(fmodf(2.0f * i, 1.0f));
+	float s2 = f_wave(fmodf(3.0f * i, 1.0f));
+	float s3 = f_wave(fmodf(4.0f * i, 1.0f));
+	float s4 = f_wave(fmodf(5.0f * i, 1.0f));
+	return s0 + h1 * s1 + h2 * s2 + h3 * s3 + h4 * s4;
 }
 
-static inline float wave_harmonic(float i, float a1, float a2, float a3, float a4){
-	float s0 = wave(i);
-	float s1 = wave(fmodf(2.0f * i, 1.0f));
-	float s2 = wave(fmodf(3.0f * i, 1.0f));
-	float s3 = wave(fmodf(4.0f * i, 1.0f));
-	float s4 = wave(fmodf(5.0f * i, 1.0f));
-	return s0 + a1 * s1 + a2 * s2 + a3 * s3 + a4 * s4;
-}
-
-static void render_sect(nm_ctx ctx, uint64_t samples_done, int len, nm_sample samples){
-	memset(samples, 0, sizeof(nm_sample_st) * len);
-	for (int i = 0; i < ctx->midi->max_channels; i++){
-		for (int n = 0; n < 128; n++){
-			float fade = ctx->chans[i].notes[n].fade;
-			float dfade = ctx->chans[i].notes[n].dfade;
-			float attack = 0.001f;
-			float decay = 1.0f;
-			float sustain = 0.5f;
-			bool sustaining = ctx->chans[i].notes[n].down;
-			if (ctx->chans[i].notes[n].hit){
-				ctx->chans[i].notes[n].hit = false;
+static void render_sect(nm_ctx ctx, int len, nm_sample samples){
+	nm_voice vc = ctx->voices_used;
+	nm_voice *vc_prev = &ctx->voices_used;
+	while (vc){
+		bool keep;
+		if (vc->f_render)
+			keep = vc->f_render(ctx, vc, len, samples);
+		else{
+			// default additive synthesizer
+			nm_defvoiceinf vi = vc->voiceinf;
+			nm_defpatchinf pi = vc->patchinf;
+			float fade = vi->fade;
+			float dfade = vi->dfade;
+			float peak = pi->peak;
+			float attack = pi->attack;
+			float decay = pi->decay;
+			float sustain = pi->sustain;
+			float h1 = pi->harmonic1;
+			float h2 = pi->harmonic2;
+			float h3 = pi->harmonic3;
+			float h4 = pi->harmonic4;
+			bool sustaining = vc->down;
+			float (*f_wave)(float i) = pi->f_wave;
+			if (vc->samptot == 0){
+				fade = 0;
 				dfade = 1.0f / (attack * ctx->samples_per_sec);
-				ctx->chans[i].notes[n].dfade = dfade;
+				vi->dfade = dfade;
 			}
-			else if (ctx->chans[i].notes[n].release){
-				ctx->chans[i].notes[n].release = false;
+			else if (vc->released){
 				dfade = -1.0f / (decay * ctx->samples_per_sec);
-				ctx->chans[i].notes[n].dfade = dfade;
+				vi->dfade = dfade;
 			}
 			if (fade > 0 || dfade > 0){
-				float amp = ctx->chans[i].notes[n].hit_velocity;
+				float amp = vc->vel * peak;
 				sustain *= amp;
-				float cycle_pos = ctx->chans[i].notes[n].cycle_pos;
-				float dcycle_pos = ctx->chans[i].notes[n].dcycle_pos;
+				float cyc = vc->cyc;
+				float dcyc = vc->dcyc;
 				for (int a = 0; a < len; a++){
-					float v = fade * fade * 0.5f *
-						wave_harmonic(fmodf(cycle_pos + a * dcycle_pos, 1.0f),
-							9.0f / 15.0f,
-							4.0f / 15.0f,
-							2.0f / 15.0f,
-							1.0f / 15.0f
-						);
-					if ((i % 16) == 9) // mute GM1 drum channel TODO: this is a hack
-						v = 0;
+					float v = fade * fade *
+						wave_harmonic(fmodf(cyc + a * dcyc, 1.0f), h1, h2, h3, h4, f_wave);
 					if (dfade > 0){
 						fade += dfade;
 						if (fade >= amp){
 							dfade = -1.0f / (decay * ctx->samples_per_sec);
-							ctx->chans[i].notes[n].dfade = dfade;
+							vi->dfade = dfade;
 						}
 					}
 					else if (fade > 0 && (!sustaining || fade > sustain)){
@@ -1227,50 +1145,144 @@ static void render_sect(nm_ctx ctx, uint64_t samples_done, int len, nm_sample sa
 					samples[a].L += v;
 					samples[a].R += v;
 				}
-				ctx->chans[i].notes[n].fade = fade;
-				ctx->chans[i].notes[n].cycle_pos = fmodf(cycle_pos + len * dcycle_pos, 1.0);
+				vi->fade = fade;
 			}
+			keep = fade > 0 || dfade > 0;
+		}
+		if (keep){
+			// advance vc stats
+			vc->samptot += len;
+			vc->cyc += len * vc->dcyc;
+			vc->cyctot += (int)vc->cyc;
+			vc->cyc = fmodf(vc->cyc, 1.0f);
+			vc->released = false;
+			vc = vc->next;
+		}
+		else{
+			// move vc over to voices_free
+			nm_voice vcn = vc->next;
+			vc->next = ctx->voices_free;
+			ctx->voices_free = vc;
+			vc = vcn;
 		}
 	}
 }
 
-int nm_ctx_process(nm_ctx ctx, int sample_len, nm_sample samples){
+void nm_ctx_process(nm_ctx ctx, int sample_len, nm_sample samples){
 	int total_out = 0;
-	nm_event ev = ctx->ev;
-	while (ev){
+	while (ctx->ev_read != ctx->ev_write){
+		nm_event ev = &ctx->events[ctx->ev_read];
 		double next_ev_sample = round(((double)ev->tick - ctx->ticks) * ctx->samples_per_tick);
 		if (next_ev_sample > sample_len - total_out){
 			// the next event is after these samples, so just render the rest and return
-			render_sect(ctx, ctx->samples_done, sample_len - total_out, &samples[total_out]);
+			render_sect(ctx, sample_len - total_out, &samples[total_out]);
 			ctx->ticks += (double)(sample_len - total_out) / ctx->samples_per_tick;
-			ctx->samples_done += sample_len - total_out;
-			for (int i = 0; i < 128; i++){
-				int cnt = ctx->notedowns[i];
-				if (cnt == 0)
-					printf(" ");
-				else if (cnt == 1)
-					printf(".");
-				else if (cnt == 2)
-					printf(":");
-				else if (cnt == 3)
-					printf("&");
-				else if (cnt == 4)
-					printf("#");
-				else
-					printf("@");
-			}
-			printf("|\n");
-			return sample_len;
+			return;
 		}
 
 		if (next_ev_sample > 0){
 			// render before the event
-			render_sect(ctx, ctx->samples_done, next_ev_sample, &samples[total_out]);
+			render_sect(ctx, next_ev_sample, &samples[total_out]);
 			total_out += next_ev_sample;
 			ctx->ticks += next_ev_sample / ctx->samples_per_tick;
-			ctx->samples_done += next_ev_sample;
 		}
+
 		// process event
+		if (ev->type == NM_EV_RESET){
+		}
+		else if (ev->type == NM_EV_NOTEON){
+			nm_voice vc = ctx->voices_free;
+			if (vc){
+				// allocate a voice by moving it from voices_free to voices_used
+				ctx->voices_free = vc->next;
+				vc->next = ctx->voices_used;
+				ctx->voices_used = vc;
+
+				// initialize voice
+				nm_channel chan = &ctx->channels[ev->channel];
+				nm_patch pt = chan->patch;
+				uint8_t pstat = ctx->patchinf_status[chan->patch];
+				// 0 = unallocated, 1 = default synth, 2 = custom synth
+				if (pstat == 0){
+					// attempt to allocate patch
+					pstat = 1;
+					if (ctx->f_patch_setup){
+						if (ctx->f_patch_setup(ctx, ctx->synth, pt, ctx->patchinf[pt]))
+							pstat = 2;
+					}
+					if (pstat == 1){
+						// intiailize patchinf to default synth info
+						nm_defpatchinf pi = ctx->patchinf[pt];
+						pi->peak      = melodicpatch[pt].peak;
+						pi->attack    = melodicpatch[pt].attack;
+						pi->decay     = melodicpatch[pt].decay;
+						pi->sustain   = melodicpatch[pt].sustain;
+						pi->harmonic1 = melodicpatch[pt].harmonic1;
+						pi->harmonic2 = melodicpatch[pt].harmonic2;
+						pi->harmonic3 = melodicpatch[pt].harmonic3;
+						pi->harmonic4 = melodicpatch[pt].harmonic4;
+						if (melodicpatch[pt].wave == 0)
+							pi->f_wave = wave_sine;
+						else if (melodicpatch[pt].wave == 1)
+							pi->f_wave = wave_saw;
+						else if (melodicpatch[pt].wave == 2)
+							pi->f_wave = wave_square;
+						else
+							pi->f_wave = wave_triangle;
+					}
+					ctx->patchinf_status[chan->patch] = pstat;
+				}
+				vc->f_render = pstat == 1 ? NULL : ctx->f_render;
+				vc->synth = ctx->synth;
+				vc->patchinf = ctx->patchinf[pt];
+				vc->patch = pt;
+				vc->note = ev->data1;
+				vc->channel = ev->channel;
+				vc->samptot = 0;
+				vc->cyctot = 0;
+				vc->vel = ev->u.data2f;
+				vc->mod = 0;
+				vc->cyc = 0;
+				// TODO: wire frequency of note to a tuning table
+				float freq = 440.0f * powf(2.0f, ((float)ev->data1 - 69.0f) / 12.0f);
+				vc->dcyc = 1.0f / ((float)ctx->samples_per_sec / freq);
+				vc->down = true;
+				vc->released = false;
+			}
+		}
+		else if (ev->type == NM_EV_NOTEMOD){
+			// TODO: this
+		}
+		else if (ev->type == NM_EV_NOTEOFF){
+			// search for the right note/channel and turn it off
+			nm_voice vc = ctx->voices_used;
+			while (vc){
+				if (vc->channel == ev->channel && vc->note == ev->data1){
+					if (vc->down){
+						vc->down = false;
+						vc->released = true;
+					}
+					break;
+				}
+				vc = vc->next;
+			}
+		}
+		else if (ev->type == NM_EV_CHANMOD){
+			// TODO: this
+		}
+		else if (ev->type == NM_EV_CHANBEND){
+			// TODO: this
+		}
+		else if (ev->type == NM_EV_TEMPO){
+			ctx->usec_per_quarternote = ev->u.data2i;
+			recalc_spt(ctx);
+		}
+		else if (ev->type == NM_EV_PATCH){
+		}
+
+		ctx->ev_read = (ctx->ev_read + 1) % ctx->ev_size;
+	}
+	/*
 		switch (ev->type){
 			case NM_NOTEOFF: {
 				nm_note_st *note = &ctx->chans[ev->u.noteoff.channel].notes[ev->u.noteoff.note];
@@ -1316,37 +1328,33 @@ int nm_ctx_process(nm_ctx ctx, int sample_len, nm_sample samples){
 		}
 		ctx->ev = (ev = ev->next);
 	}
-	return total_out;
+	*/
 }
 
 void nm_ctx_free(nm_ctx ctx){
-	nm_voice_st *here = ctx->voice_free;
-	while (here){
-		nm_voice_st *del = here;
-		here = here->next;
+	nm_free(ctx->events);
+	nm_wevent wev = ctx->wevents;
+	while (wev){
+		nm_wevent del = wev;
+		wev = wev->next;
 		nm_free(del);
 	}
-	here = ctx->voice_used;
-	while (here){
-		nm_voice_st *del = here;
-		here = here->next;
+	nm_voice vc = ctx->voices_free;
+	while (vc){
+		nm_voice del = vc;
+		vc = vc->next;
+		nm_free(del->voiceinf);
 		nm_free(del);
 	}
-	nm_free(ctx->chans);
+	vc = ctx->voices_used;
+	while (vc){
+		nm_voice del = vc;
+		vc = vc->next;
+		nm_free(del->voiceinf);
+		nm_free(del);
+	}
+	nm_free(ctx->channels);
+	for (int i = 0; i < NM__PATCH_END; i++)
+		nm_free(ctx->patchinf[i]);
 	nm_free(ctx);
-}
-
-void nm_midi_free(nm_midi midi){
-	if (midi->tracks){
-		for (int i = 0; i < midi->track_count; i++){
-			nm_event ev_here = midi->tracks[i];
-			while (ev_here){
-				nm_event delme = ev_here;
-				ev_here = ev_here->next;
-				nm_free(delme);
-			}
-		}
-		nm_free(midi->tracks);
-	}
-	nm_free(midi);
 }

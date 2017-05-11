@@ -33,51 +33,53 @@ typedef enum nm_notemsg_enum nm_notemsg;
 //
 
 typedef struct nm_event_struct nm_event_st, *nm_event;
+typedef struct nm_wevent_struct nm_wevent_st, *nm_wevent;
 typedef struct nm_midi_struct nm_midi_st, *nm_midi;
 typedef struct nm_sample_struct nm_sample_st, *nm_sample;
 typedef struct nm_note_struct nm_note_st, *nm_note;
-typedef struct nm_voice_struct nm_voice_st;
-typedef struct nm_ctx_struct nm_ctx_st, *nm_ctx;
+typedef struct nm_defpatchinf_struct nm_defpatchinf_st, *nm_defpatchinf;
+typedef struct nm_defvoiceinf_struct nm_defvoiceinf_st, *nm_defvoiceinf;
+typedef struct nm_voice_struct nm_voice_st, *nm_voice;
 typedef struct nm_channel_struct nm_channel_st, *nm_channel;
+typedef struct nm_ctx_struct nm_ctx_st, *nm_ctx;
 
 //
 // function pointers
 //
 
 typedef void (*nm_warn_func)(const char *warning, void *user);
+typedef bool (*nm_synth_patch_setup_func)(nm_ctx ctx, void *synth, nm_patch patch, void *patchinf);
+typedef bool (*nm_synth_render_func)(nm_ctx ctx, nm_voice voice, int len, nm_sample samples);
 
 //
 // API
 //
 
-// old api
-
-nm_midi     nm_midi_newfile(const char *file, nm_warn_func f_warn, void *user);
-nm_midi     nm_midi_newbuffer(uint64_t size, uint8_t *data, nm_warn_func f_warn, void *user);
-const char *nm_event_type_str(nm_event_type type);
+nm_ctx      nm_ctx_new(uint16_t ticks_per_quarternote, uint16_t channels, int voices,
+	int samples_per_sec, void *synth, size_t sizeof_patchinf, size_t sizeof_voiceinf,
+	nm_synth_patch_setup_func f_patch_setup, nm_synth_render_func f_render);
+bool        nm_midi_newfile(nm_ctx ctx, const char *file, nm_warn_func f_warn, void *user);
+bool        nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_warn,
+	void *user);
 const char *nm_patch_str(nm_patch p);
 nm_patchcat nm_patch_category(nm_patch p);
 const char *nm_patchcat_str(nm_patchcat pc);
-nm_ctx      nm_ctx_new(nm_midi midi, int track, int voices, int samples_per_sec);
-int         nm_ctx_process(nm_ctx ctx, int sample_len, nm_sample samples);
+void        nm_ev_reset(nm_ctx ctx, uint32_t tick, uint16_t ticks_per_quarternote);
+void        nm_ev_noteon(nm_ctx ctx, uint32_t tick, uint16_t channel, uint8_t note, float vel);
+void        nm_ev_notemod(nm_ctx ctx, uint32_t tick, uint16_t channel, uint8_t note, float mod);
+void        nm_ev_noteoff(nm_ctx ctx, uint32_t tick, uint16_t channel, uint8_t note);
+void        nm_ev_chanmod(nm_ctx ctx, uint32_t tick, uint16_t channel, float mod);
+void        nm_ev_chanbend(nm_ctx ctx, uint32_t tick, uint16_t channel, float bend);
+void        nm_ev_tempo(nm_ctx ctx, uint32_t tick, uint32_t usec_per_quarternote);
+void        nm_ev_patch(nm_ctx ctx, uint32_t tick, uint16_t channel, nm_patch patch);
+void        nm_ctx_bake(nm_ctx ctx, uint32_t ticks);
+void        nm_ctx_clear(nm_ctx ctx);
+void        nm_ctx_process(nm_ctx ctx, int sample_len, nm_sample samples);
 void        nm_ctx_free(nm_ctx ctx);
-void        nm_midi_free(nm_midi midi);
 
 //
 // enum details
 //
-
-enum nm_event_type_enum {
-	NM_NOTEOFF,
-	NM_NOTEON,
-	NM_NOTEPRESSURE,
-	NM_CONTROLCHANGE,
-	NM_PROGRAMCHANGE,
-	NM_CHANNELPRESSURE,
-	NM_PITCHBEND,
-	NM_TEMPO,
-	NM_TIMESIG
-};
 
 enum nm_patchcat_enum {
 	NM_PIANO,  // Piano
@@ -378,162 +380,107 @@ enum nm_patch_enum {
 	NM__PATCH_END
 };
 
-enum nm_notemsg_enum {
-	NM_MSG_NOTEOFF,
-	NM_MSG_PITCHBEND,
-	NM_MSG_PRESSURE
+enum nm_event_type_enum {
+	NM_EV_RESET,
+	NM_EV_NOTEON,
+	NM_EV_NOTEMOD,
+	NM_EV_NOTEOFF,
+	NM_EV_CHANMOD,
+	NM_EV_CHANBEND,
+	NM_EV_TEMPO,
+	NM_EV_PATCH
 };
 
 //
 // structure details
 //
 
-struct nm_note_struct {
-	int note;
-	float freq;
-	float cycle_pos;
-	float dcycle_pos;
-	float hit_velocity;
-	float hold_pressure;
-	float release_velocity;
-	float fade;
-	float dfade;
-	bool hit;
-	bool down;
-	bool release;
+struct nm_event_struct {
+	uint32_t tick;
+	uint8_t type; // nm_event_type
+	uint8_t data1;
+	uint16_t channel;
+	union {
+		float data2f;
+		uint32_t data2i;
+	} u;
 };
 
-struct nm_channel_struct {
-	nm_note_st notes[128];
-	float pressure;
-	float pitch_bend;
+struct nm_wevent_struct {
+	nm_wevent prev;
+	nm_wevent next;
+	nm_event_st ev;
+};
+
+struct nm_defpatchinf_struct {
+	float peak;
+	float attack;
+	float decay;
+	float sustain;
+	float harmonic1;
+	float harmonic2;
+	float harmonic3;
+	float harmonic4;
+	float (*f_wave)(float i);
+};
+
+struct nm_defvoiceinf_struct {
+	float fade;
+	float dfade;
 };
 
 struct nm_voice_struct {
-	nm_voice_st *next;
-	void *user;
+	nm_voice next;
+	nm_synth_render_func f_render;
+	void *synth;
+	void *patchinf;
+	void *voiceinf;
+	nm_patch patch;
+	uint8_t note;
+	uint16_t channel;
+	int samptot;
+	int cyctot;
+	float vel;
+	float mod;
+	float cyc;
+	float dcyc;
+	bool down;
+	bool released;
+};
+
+struct nm_channel_struct {
+	nm_patch patch;
+	float bend;
+	float mod;
 };
 
 struct nm_ctx_struct {
-	nm_midi midi;
+	void *synth;
+	nm_synth_patch_setup_func f_patch_setup;
+	nm_synth_render_func f_render;
+	nm_event events;
+	nm_wevent wevents; // the wevent at the start of the linked-list
+	nm_wevent last_wevent; // the wevent at the end of the linked-list
+	nm_wevent ins_wevent; // the last wevent that was inserted
+	int ev_size;
+	int ev_read;
+	int ev_write;
+	uint16_t ticks_per_quarternote;
+	int samples_per_sec;
+	uint32_t usec_per_quarternote;
 	double ticks;
 	double samples_per_tick;
-	uint64_t samples_done;
-	nm_channel_st *chans;
-	nm_voice_st *voice_free;
-	nm_voice_st *voice_used;
-	nm_event ev;
-	double samples_per_sec;
-	int notedowns[128];
-	bool ignore_timesig;
+	nm_voice voices_free;
+	nm_voice voices_used;
+	nm_channel channels;
+	uint16_t channel_count;
+	uint8_t patchinf_status[NM__PATCH_END]; // 0 = unallocated, 1 = default synth, 2 = custom synth
+	void *patchinf[NM__PATCH_END];
 };
 
 struct nm_sample_struct {
 	float L;
 	float R;
 };
-
-struct nm_event_struct {
-	nm_event_st *next;
-	nm_event_type type;
-	uint64_t tick;
-	union {
-		struct { int channel; int note; float velocity; } noteoff;
-		struct { int channel; int note; float velocity; } noteon;
-		struct { int channel; int note; float pressure; } notepressure;
-		struct { int channel; int control; int value;   } controlchange;
-		struct { int channel; int patch;                } programchange;
-		struct { int channel; float pressure;           } channelpressure;
-		struct { int channel; float bend;               } pitchbend;
-		struct { int tempo;                             } tempo;
-		struct { int num; int den; int cc; int dd;      } timesig;
-	} u;
-};
-
-struct nm_midi_struct {
-	nm_event *tracks;
-	int track_count;
-	int ticks_per_q;
-	int max_channels;
-};
-
-//
-// new api
-//
-
-// temporarily putting this here until I flesh it out completely
-// ...
-
-typedef bool (*nm_synth_patch_setup_func)(nm_ctx ctx, void *synth, nm_patch patch, void *patchinf);
-typedef bool (*nm_synth_render_func)(nm_ctx ctx, void *synth, int len, nm_sample samples,
-	void *patchinf, float vel, float mod, int sampdone, int cycdone, float cycpos, float dcyc);
-
-typedef enum nm_event2_type_enum nm_event2_type;
-
-typedef struct nm_event2_struct nm_event2_st, *nm_event2;
-typedef struct nm_channel2_struct nm_channel2_st, *nm_channel2;
-typedef struct nm_voice2_struct nm_voice2_st, *nm_voice2;
-typedef struct nm_ctx2_struct nm_ctx2_st, *nm_ctx2;
-
-enum nm_event2_type_enum {
-	NM_EV_RESET,
-	NM_EV_NOTEON,
-	NM_EV_NOTEBEND,
-	NM_EV_NOTEMOD,
-	NM_EV_NOTEOFF,
-	NM_EV_TEMPO,
-	NM_EV_PATCH
-};
-
-struct nm_event2_struct {
-	uint32_t tick;
-	uint8_t type; // nm_event2_type
-	uint8_t channel;
-	uint16_t data1;
-	float data2;
-};
-
-struct nm_voice2_struct {
-	nm_voice2 next;
-	nm_synth_render_func f_render;
-	void *patchinf;
-	nm_patch patch;
-	int sampdone;
-	int cycdone;
-	float vel;
-	float cycpos;
-	float dcyc;
-};
-
-struct nm_ctx2_struct {
-	void *synth;
-	nm_synth_patch_setup_func f_patch_setup;
-	nm_synth_render_func f_render;
-	nm_event2 events;
-	int ev_size;
-	int ev_read;
-	int ev_write;
-	int ticks_per_quarternote;
-	int samples_per_sec;
-	int usec_per_quarternote;
-	double ticks;
-	double samples_per_tick;
-	nm_voice2 voices_free;
-	nm_voice2 voices_used;
-	nm_patch *channel_patch;
-	int channels;
-	uintptr_t patchinf[NM__PATCH_END];
-	// 0 = uninitialized, 1 = default synth, 2 = zero length custom synth
-	// 3+ = pointer to data of size sizeof_patchinf
-};
-
-nm_ctx2 nm_ctx2_new(int channels, int voices, int samples_per_sec, void *synth,
-	size_t sizeof_patchinf, nm_synth_patch_setup_func f_patch_setup, nm_synth_render_func f_render);
-void    nm_ctx2_bake(nm_ctx2 ctx, uint32_t ticks);
-void    nm_ctx2_process(nm_ctx2 ctx, int sample_len, nm_sample samples);
-void    nm_ctx2_free(nm_ctx2 ctx);
-
-// ...
-// end temp
 
 #endif // NIGHTMARE__H
