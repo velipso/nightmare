@@ -195,6 +195,17 @@ int main(int argc, char **argv){
 		fprintf(stderr, "Failed to load MIDI file: %s\n", argv[1]);
 		return 1;
 	}
+
+	{
+		int ev_count = 0;
+		nm_event here = midi->tracks[0];
+		while (here){
+			ev_count++;
+			here = here->next;
+		}
+		printf("Total Events: %d\n", ev_count);
+	}
+
 	nm_ctx ctx = nm_ctx_new(midi, 0, 32, 48000);
 	if (ctx == NULL){
 		fprintf(stderr, "Out of memory\n");

@@ -3,14 +3,15 @@ MIDI File Format
 
 This document is my attempt at simplifying and clairifying the MIDI file format.
 
-I've used three primary sources of information:
+I've used two primary sources of information:
 
 1. [Official MIDI specifications](https://midi.org)
-2. [Yamaha XF Format specification](http://www.jososoft.dk/yamaha//pdf/xfspec.pdf)
-3. Real-world MIDI files
+2. Real-world MIDI files
 
 I also searched the Internet for random things I found in the files, to hopefully dig up some
-additional context and information.
+additional context and information -- specifically, there are points where organizations can extend
+MIDI with their own codes, so decoding certain messages requires (hopefully) finding information
+from the appropriate manufacturer.
 
 My intention is to document what a MIDI file *should* look like (for encoders), but also what
 real-world data looks like (for lenient decoders).
@@ -26,6 +27,9 @@ This archive has 48,197 MIDI files, totalling 1.3 GB of data.
 
 The data also happens to be pretty damn dirty too -- which helps us in figuring out good strategies
 for recovering useful information.
+
+I've also downloaded the entire [VGMusic.com](http://vgmusic.com/) website, which provided another
+30,687 MIDI files, 886 MB of data.
 
 MIDI Overview
 -------------
@@ -366,6 +370,8 @@ second) to figure out the *samples per tick*: Sample Rate /
 One last note: there needs to be care taken when calculating timing because a MIDI file can change
 the tempo or time signature during the middle of the song, which will change how ticks map to
 samples.
+
+TODO: analyze how many midi files don't have tempo, or have timesig before tempo affecting timing
 
 Appendix: SysEx Manufacturer ID Numbers
 ========================================
