@@ -915,7 +915,6 @@ bool nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_
 											track_i);
 									}
 									else{
-										printf("regular tempo %d\n", tempo);
 										ignore_timesig = true;
 										nm_ev_tempo(ctx, ticks, tempo);
 									}
@@ -935,7 +934,6 @@ bool nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_
 											track_i);
 									}
 									if (!ignore_timesig){
-										printf("timesig tempo\n");
 										nm_ev_tempo(ctx, ticks, (uint32_t)
 											(1000000.0f / powf(2.0f, 3.0f - data[p + 1])));
 									}
