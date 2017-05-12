@@ -88,6 +88,7 @@ void process_midi(const char *file){
 }
 
 #ifndef NDEBUG
+// memory leak detection
 static SDL_sem *mem_lock;
 typedef struct m_debug_memlist_struct {
 	void *p;
@@ -96,6 +97,7 @@ typedef struct m_debug_memlist_struct {
 static m_debug_memlist mem_list = NULL;
 
 void *db_alloc(size_t size){
+	printf("alloc\n");
 	void *p = malloc(size);
 	m_debug_memlist m = malloc(sizeof(m_debug_memlist_st));
 	m->p = p;
@@ -107,6 +109,7 @@ void *db_alloc(size_t size){
 }
 
 void *db_realloc(void *p, size_t size){
+	printf("realloc\n");
 	void *new_p;
 	if (p == NULL){
 		m_debug_memlist m = malloc(sizeof(m_debug_memlist_st));
@@ -136,6 +139,7 @@ void *db_realloc(void *p, size_t size){
 }
 
 void db_free(void *p){
+	printf("free\n");
 	if (p == NULL)
 		return;
 	SDL_SemWait(mem_lock);
@@ -173,9 +177,6 @@ void db_flush(){
 	else
 		fprintf(stderr, "%d memory leak%s\n", count, count == 1 ? "" : "s");
 }
-
-
-
 #endif
 
 SDL_sem *lock_write;
@@ -263,15 +264,13 @@ int main(int argc, char **argv){
 	// f/For_Those_About_To_Rock.MID    // 0-size MTrk
 
 	// TODO:
-	//  voice based generation
 	//  pitch bends (coarse and fine grained)
 	//  understand control changes
-	//  synth plugins
 	//  drums
 	//  poly mode
 	//  omni mode should perform all notes on/off because GM2 doesn't use omni mode
 
-	nm_ctx ctx = nm_ctx_new(480, 256, 32, 48000, NULL, 0, 0, NULL, NULL);
+	nm_ctx ctx = nm_ctx_new(480, 1024, 32, 48000, NULL, 0, 0, NULL, NULL);
 	if (ctx == NULL){
 		fprintf(stderr, "Out of memory\n");
 		#ifndef NDEBUG
@@ -283,6 +282,10 @@ int main(int argc, char **argv){
 
 	if (!nm_midi_newfile(ctx, argv[1], midi_warn, NULL)){
 		fprintf(stderr, "Failed to process midi file: %s\n", argv[1]);
+		#ifndef NDEBUG
+		SDL_DestroySemaphore(mem_lock);
+		SDL_Quit();
+		#endif
 		return 1;
 	}
 
@@ -332,6 +335,10 @@ int main(int argc, char **argv){
 			}
 			SDL_DestroySemaphore(lock_write);
 		}
+		#ifndef NDEBUG
+		printf("hit a key to close audio device\n");
+		fgetc(stdin);
+		#endif
 		SDL_CloseAudioDevice(dev);
 	}
 
@@ -341,5 +348,9 @@ int main(int argc, char **argv){
 	SDL_DestroySemaphore(mem_lock);
 	#endif
 	SDL_Quit();
+	#ifndef NDEBUG
+	printf("hit a key to exit\n");
+	fgetc(stdin);
+	#endif
 	return 0;
 }

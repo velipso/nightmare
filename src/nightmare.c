@@ -605,7 +605,7 @@ bool nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_
 					chan_base = track_i * 16;
 				}
 				max_channels = chan_base + 16;
-				if (max_channels > 256){
+				if (max_channels > ctx->channel_count){
 					warn(f_warn, user, "Too many simultaneous tracks, ignoring track %d", track_i);
 					goto mtrk_end;
 				}
