@@ -189,6 +189,16 @@ int sdl_render_audio(void *data){
 		SDL_SemWait(lock_write);
 		memset(sample_buffer, 0, sizeof(nm_sample_st) * sample_buffer_size);
 		nm_ctx_process(ctx, sample_buffer_size, sample_buffer);
+		for (int i = 0; i < 128; i++){
+			int cnt = ctx->notecnt[i];
+			if      (cnt == 0) printf(" ");
+			else if (cnt == 1) printf(".");
+			else if (cnt == 2) printf(":");
+			else if (cnt == 3) printf("&");
+			else if (cnt == 4) printf("#");
+			else               printf("@");
+		}
+		printf("|\n");
 		#ifndef NDEBUG
 		// crappy click detection
 		#if 0

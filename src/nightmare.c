@@ -1398,18 +1398,6 @@ void nm_ctx_process(nm_ctx ctx, int sample_len, nm_sample samples){
 			// the next event is after these samples, so just render the rest and return
 			render_sect(ctx, sample_len - total_out, &samples[total_out]);
 			ctx->ticks += (double)(sample_len - total_out) / ctx->samples_per_tick;
-
-			for (int i = 0; i < 128; i++){
-				int cnt = ctx->notecnt[i];
-				if      (cnt == 0) printf(" ");
-				else if (cnt == 1) printf(".");
-				else if (cnt == 2) printf(":");
-				else if (cnt == 3) printf("&");
-				else if (cnt == 4) printf("#");
-				else               printf("@");
-			}
-			printf("|\n");
-
 			return;
 		}
 
