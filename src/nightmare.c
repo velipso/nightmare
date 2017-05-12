@@ -33,7 +33,7 @@ static struct {
 	float harmonic4; // 4th, freq * 5
 	uint8_t wave;    // sine(0), saw(1), square(2), triangle(3)
 } melodicpatch[256] = {
-	/* NM_PIANO_ACGR    */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
+	/* NM_PIANO_ACGR    */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 1 },
 	/* NM_PIANO_ACGR_WI */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
 	/* NM_PIANO_ACGR_DK */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
 	/* NM_PIANO_BRAC    */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
@@ -915,6 +915,7 @@ bool nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_
 											track_i);
 									}
 									else{
+										printf("regular tempo %d\n", tempo);
 										ignore_timesig = true;
 										nm_ev_tempo(ctx, ticks, tempo);
 									}
@@ -934,6 +935,7 @@ bool nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_
 											track_i);
 									}
 									if (!ignore_timesig){
+										printf("timesig tempo\n");
 										nm_ev_tempo(ctx, ticks, (uint32_t)
 											(1000000.0f / powf(2.0f, 3.0f - data[p + 1])));
 									}
@@ -1091,6 +1093,8 @@ static inline void wev_insert(nm_ctx ctx, uint32_t tick, nm_wevent wev){
 }
 
 bool nm_ev_nop(nm_ctx ctx, uint32_t tick){
+	if (ctx->wevents && ctx->wevents->ev.tick == tick)
+		return true;
 	nm_wevent wev = nm_alloc(sizeof(nm_wevent_st));
 	if (wev == NULL)
 		return false;
@@ -1201,11 +1205,18 @@ bool nm_ev_patch(nm_ctx ctx, uint32_t tick, uint16_t channel, nm_patch patch){
 
 bool nm_ctx_bake(nm_ctx ctx, uint32_t ticks){
 	// count how many events we need to insert
-	int evtot = 1; // always have an extra event at the end
+	int evtot = 0;
 	nm_wevent wev = ctx->wevents;
+	uint32_t last_tick = 0;
 	while (wev && wev->ev.tick <= ticks){
 		evtot++;
+		last_tick = wev->ev.tick;
 		wev = wev->next;
+	}
+	if (last_tick < ticks){
+		// need to insert a nop at the last tick to ensure the time gets rendered
+		evtot++;
+		nm_ev_nop(ctx, last_tick);
 	}
 
 	// see how many slots we have left
@@ -1243,7 +1254,7 @@ bool nm_ctx_bake(nm_ctx ctx, uint32_t ticks){
 	// copy over the events
 	wev = ctx->wevents;
 	bool found_ins = false;
-	for (int i = 1; i < evtot; i++){
+	for (int i = 0; i < evtot; i++){
 		if (wev == ctx->ins_wevent)
 			found_ins = true;
 		ctx->events[ctx->ev_write] = wev->ev;
@@ -1302,10 +1313,10 @@ static float wave_triangle(float i){
 static inline float wave_harmonic(float i, float h1, float h2, float h3, float h4,
 	float (*f_wave)(float i)){
 	float s0 = f_wave(i);
-	float s1 = 0;//f_wave(fmodf(2.0f * i, 1.0f));
-	float s2 = 0;//f_wave(fmodf(3.0f * i, 1.0f));
-	float s3 = 0;//f_wave(fmodf(4.0f * i, 1.0f));
-	float s4 = 0;//f_wave(fmodf(5.0f * i, 1.0f));
+	float s1 = f_wave(fmodf(2.0f * i, 1.0f));
+	float s2 = f_wave(fmodf(3.0f * i, 1.0f));
+	float s3 = f_wave(fmodf(4.0f * i, 1.0f));
+	float s4 = f_wave(fmodf(5.0f * i, 1.0f));
 	return s0 + h1 * s1 + h2 * s2 + h3 * s3 + h4 * s4;
 }
 
@@ -1412,6 +1423,15 @@ void nm_ctx_process(nm_ctx ctx, int sample_len, nm_sample samples){
 		if (ev->type == NM_EV_NOP)
 			/* do nothing */;
 		else if (ev->type == NM_EV_RESET){
+			reset_tempo(ctx, ev->u.data2i);
+			// silent all voices
+			nm_voice vc = ctx->voices_used;
+			while (vc){
+				nm_voice next = vc->next;
+				vc->next = ctx->voices_free;
+				ctx->voices_free = vc;
+				vc = next;
+			}
 		}
 		else if (ev->type == NM_EV_NOTEON){
 			nm_voice vc = ctx->voices_free;
@@ -1503,6 +1523,7 @@ void nm_ctx_process(nm_ctx ctx, int sample_len, nm_sample samples){
 			recalc_spt(ctx);
 		}
 		else if (ev->type == NM_EV_PATCH){
+			// TODO: this
 		}
 
 		// advance read index
