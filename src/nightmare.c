@@ -398,6 +398,8 @@ nm_ctx nm_ctx_new(uint16_t ticks_per_quarternote, uint16_t channels, int voices,
 		}
 	}
 
+	memset(ctx->notecnt, 0, sizeof(int) * 128);
+
 	return ctx;
 }
 
@@ -598,8 +600,10 @@ bool nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_
 					ignore_timesig = false;
 					nm_ev_reset(ctx, ticks, hd_ticks_per_q);
 				}
-				if (hd_format == 1)
+				if (hd_format == 1){
+					ticks = 0;
 					chan_base = track_i * 16;
+				}
 				max_channels = chan_base + 16;
 				if (max_channels > 256){
 					warn(f_warn, user, "Too many simultaneous tracks, ignoring track %d", track_i);
@@ -954,6 +958,7 @@ bool nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_
 				warn(f_warn, user, "Track %d ended before receiving End of Track message",
 					track_i);
 				mtrk_end:
+				nm_ev_nop(ctx, ticks);
 				track_i++;
 			} break;
 
@@ -1039,39 +1044,253 @@ const char *nm_patchcat_str(nm_patchcat pc){
 	return "Unknown";
 }
 
-void nm_ev_reset(nm_ctx ctx, uint32_t tick, uint16_t ticks_per_quarternote){
+static inline void wev_insert(nm_ctx ctx, uint32_t tick, nm_wevent wev){
+	wev->ev.tick = tick;
+	if (ctx->wevents == NULL){
+		// first event
+		wev->next = NULL;
+		ctx->wevents = ctx->last_wevent = ctx->ins_wevent = wev;
+	}
+	else if (tick < ctx->wevents->ev.tick){
+		// insert at start
+		wev->next = ctx->wevents;
+		ctx->wevents = wev;
+	}
+	else if (tick < ctx->ins_wevent->ev.tick){
+		// between start and ins_wevent, so search forwards from start
+		nm_wevent prev = ctx->wevents;
+		while (tick >= prev->next->ev.tick)
+			prev = prev->next;
+		wev->next = prev->next;
+		prev->next = wev;
+		ctx->ins_wevent = wev;
+	}
+	else if (tick == ctx->ins_wevent->ev.tick){
+		// insert immediately after ins_wevent
+		wev->next = ctx->ins_wevent->next;
+		ctx->ins_wevent->next = wev;
+		if (ctx->ins_wevent == ctx->last_wevent)
+			ctx->last_wevent = wev;
+		ctx->ins_wevent = wev;
+	}
+	else if (tick < ctx->last_wevent->ev.tick){
+		// between ins_wevent and last, so search forwards from ins_wevent
+		nm_wevent prev = ctx->ins_wevent;
+		while (tick >= prev->next->ev.tick)
+			prev = prev->next;
+		wev->next = prev->next;
+		prev->next = wev;
+		ctx->ins_wevent = wev;
+	}
+	else{
+		// after last_wevent
+		wev->next = NULL;
+		ctx->last_wevent->next = wev;
+		ctx->last_wevent = wev;
+	}
 }
 
-void nm_ev_noteon(nm_ctx ctx, uint32_t tick, uint16_t channel, uint8_t note, float vel){
+bool nm_ev_nop(nm_ctx ctx, uint32_t tick){
+	nm_wevent wev = nm_alloc(sizeof(nm_wevent_st));
+	if (wev == NULL)
+		return false;
+	wev->ev.type = NM_EV_NOP;
+	wev_insert(ctx, tick, wev);
+	return true;
 }
 
-void nm_ev_notemod(nm_ctx ctx, uint32_t tick, uint16_t channel, uint8_t note, float mod){
+bool nm_ev_reset(nm_ctx ctx, uint32_t tick, uint16_t ticks_per_quarternote){
+	nm_wevent wev = nm_alloc(sizeof(nm_wevent_st));
+	if (wev == NULL)
+		return false;
+	wev->ev.type = NM_EV_RESET;
+	wev->ev.u.data2i = ticks_per_quarternote;
+	wev_insert(ctx, tick, wev);
+	return true;
 }
 
-void nm_ev_noteoff(nm_ctx ctx, uint32_t tick, uint16_t channel, uint8_t note){
+bool nm_ev_noteon(nm_ctx ctx, uint32_t tick, uint16_t channel, uint8_t note, float vel){
+	if (channel >= ctx->channel_count || note >= 0x80)
+		return false;
+	nm_wevent wev = nm_alloc(sizeof(nm_wevent_st));
+	if (wev == NULL)
+		return false;
+	wev->ev.type = NM_EV_NOTEON;
+	wev->ev.channel = channel;
+	wev->ev.data1 = note;
+	wev->ev.u.data2f = vel;
+	wev_insert(ctx, tick, wev);
+	return true;
 }
 
-void nm_ev_chanmod(nm_ctx ctx, uint32_t tick, uint16_t channel, float mod){
+bool nm_ev_notemod(nm_ctx ctx, uint32_t tick, uint16_t channel, uint8_t note, float mod){
+	if (channel >= ctx->channel_count || note >= 0x80)
+		return false;
+	nm_wevent wev = nm_alloc(sizeof(nm_wevent_st));
+	if (wev == NULL)
+		return false;
+	wev->ev.type = NM_EV_NOTEMOD;
+	wev->ev.channel = channel;
+	wev->ev.data1 = note;
+	wev->ev.u.data2f = mod;
+	wev_insert(ctx, tick, wev);
+	return true;
 }
 
-void nm_ev_chanbend(nm_ctx ctx, uint32_t tick, uint16_t channel, float bend){
+bool nm_ev_noteoff(nm_ctx ctx, uint32_t tick, uint16_t channel, uint8_t note){
+	if (channel >= ctx->channel_count || note >= 0x80)
+		return false;
+	nm_wevent wev = nm_alloc(sizeof(nm_wevent_st));
+	if (wev == NULL)
+		return false;
+	wev->ev.type = NM_EV_NOTEOFF;
+	wev->ev.channel = channel;
+	wev->ev.data1 = note;
+	wev_insert(ctx, tick, wev);
+	return true;
 }
 
-void nm_ev_tempo(nm_ctx ctx, uint32_t tick, uint32_t usec_per_quarternote){
+bool nm_ev_chanmod(nm_ctx ctx, uint32_t tick, uint16_t channel, float mod){
+	if (channel >= ctx->channel_count)
+		return false;
+	nm_wevent wev = nm_alloc(sizeof(nm_wevent_st));
+	if (wev == NULL)
+		return false;
+	wev->ev.type = NM_EV_CHANMOD;
+	wev->ev.channel = channel;
+	wev->ev.u.data2f = mod;
+	wev_insert(ctx, tick, wev);
+	return true;
 }
 
-void nm_ev_patch(nm_ctx ctx, uint32_t tick, uint16_t channel, nm_patch patch){
+bool nm_ev_chanbend(nm_ctx ctx, uint32_t tick, uint16_t channel, float bend){
+	if (channel >= ctx->channel_count)
+		return false;
+	nm_wevent wev = nm_alloc(sizeof(nm_wevent_st));
+	if (wev == NULL)
+		return false;
+	wev->ev.type = NM_EV_CHANBEND;
+	wev->ev.channel = channel;
+	wev->ev.u.data2f = bend;
+	wev_insert(ctx, tick, wev);
+	return true;
 }
 
-void nm_ctx_bake(nm_ctx ctx, uint32_t ticks){
+bool nm_ev_tempo(nm_ctx ctx, uint32_t tick, uint32_t usec_per_quarternote){
+	nm_wevent wev = nm_alloc(sizeof(nm_wevent_st));
+	if (wev == NULL)
+		return false;
+	wev->ev.type = NM_EV_TEMPO;
+	wev->ev.u.data2i = usec_per_quarternote;
+	wev_insert(ctx, tick, wev);
+	return true;
+}
+
+bool nm_ev_patch(nm_ctx ctx, uint32_t tick, uint16_t channel, nm_patch patch){
+	if (channel >= ctx->channel_count)
+		return false;
+	nm_wevent wev = nm_alloc(sizeof(nm_wevent_st));
+	if (wev == NULL)
+		return false;
+	wev->ev.type = NM_EV_PATCH;
+	wev->ev.channel = channel;
+	wev->ev.u.data2i = patch;
+	wev_insert(ctx, tick, wev);
+	return true;
+}
+
+bool nm_ctx_bake(nm_ctx ctx, uint32_t ticks){
+	// count how many events we need to insert
+	int evtot = 1; // always have an extra event at the end
+	nm_wevent wev = ctx->wevents;
+	while (wev && wev->ev.tick <= ticks){
+		evtot++;
+		wev = wev->next;
+	}
+
+	// see how many slots we have left
+	// note we have to subtract one from what's left because we can't technically fill up the buffer
+	// completely because we interpret ev_read == ev_write to be an empty buffer
+	int evleft;
+	if (ctx->ev_read < ctx->ev_write)
+		evleft = ctx->ev_read + ctx->ev_size - ctx->ev_write - 1;
+	else if (ctx->ev_read == ctx->ev_write)
+		evleft = ctx->ev_size - 1;
+	else
+		evleft = ctx->ev_read - ctx->ev_write - 1;
+
+	// check if we have enough room
+	if (evleft < evtot){
+		// we don't, so allocate more room
+		int newsize = ctx->ev_size + evtot - evleft + 200;
+		ctx->events = nm_realloc(ctx->events, sizeof(nm_event_st) * newsize);
+		if (ctx->events == NULL)
+			return false;
+		if (ctx->ev_read > ctx->ev_write){
+			// read is after write, therefore we need to slide the remaining read events down to
+			// the end of the buffer
+			// start  : [e|W| | |R|e|e]
+			// realloc: [e|W| | |R|e|e| | | ]
+			// slide  : [e|W| | | | | |R|e|e]
+			int rightlen = ctx->ev_size - ctx->ev_read;
+			memmove(&ctx->events[newsize - rightlen], &ctx->events[ctx->ev_read],
+				sizeof(nm_event_st) * rightlen);
+			ctx->ev_read = newsize - rightlen;
+		}
+		ctx->ev_size = newsize;
+	}
+
+	// copy over the events
+	wev = ctx->wevents;
+	bool found_ins = false;
+	for (int i = 1; i < evtot; i++){
+		if (wev == ctx->ins_wevent)
+			found_ins = true;
+		ctx->events[ctx->ev_write] = wev->ev;
+		nm_wevent del = wev;
+		wev = wev->next;
+		nm_free(del);
+		ctx->ev_write = (ctx->ev_write + 1) % ctx->ev_size;
+	}
+
+	// update wevents/ins_wevent/last_wevent
+	ctx->wevents = wev;
+	if (found_ins)
+		ctx->ins_wevent = wev;
+	if (wev == NULL)
+		ctx->last_wevent = NULL;
+
+	return true;
+}
+
+bool nm_ctx_bakeall(nm_ctx ctx){
+	if (ctx->last_wevent == NULL)
+		return true;
+	return nm_ctx_bake(ctx, ctx->last_wevent->ev.tick);
 }
 
 void nm_ctx_clear(nm_ctx ctx){
+	nm_wevent wev = ctx->wevents;
+	while (wev){
+		nm_wevent del = wev;
+		wev = wev->next;
+		nm_free(del);
+	}
+	ctx->wevents = ctx->last_wevent = ctx->ins_wevent = NULL;
 }
 
-static float wave_sine  (float i){ return sinf(M_PI * 2.0f * i); }
-static float wave_saw   (float i){ return i;                     }
-static float wave_square(float i){ return i < 0.5f ? -1.0f : 1.0f; }
+static float wave_sine(float i){
+	return sinf(M_PI * 2.0f * i);
+}
+
+static float wave_saw(float i){
+	return i;
+}
+
+static float wave_square(float i){
+	return i < 0.5f ? -1.0f : 1.0f;
+}
+
 static float wave_triangle(float i){
 	if (i < 0.25f)
 		return i * 4.0f;
@@ -1083,10 +1302,10 @@ static float wave_triangle(float i){
 static inline float wave_harmonic(float i, float h1, float h2, float h3, float h4,
 	float (*f_wave)(float i)){
 	float s0 = f_wave(i);
-	float s1 = f_wave(fmodf(2.0f * i, 1.0f));
-	float s2 = f_wave(fmodf(3.0f * i, 1.0f));
-	float s3 = f_wave(fmodf(4.0f * i, 1.0f));
-	float s4 = f_wave(fmodf(5.0f * i, 1.0f));
+	float s1 = 0;//f_wave(fmodf(2.0f * i, 1.0f));
+	float s2 = 0;//f_wave(fmodf(3.0f * i, 1.0f));
+	float s3 = 0;//f_wave(fmodf(4.0f * i, 1.0f));
+	float s4 = 0;//f_wave(fmodf(5.0f * i, 1.0f));
 	return s0 + h1 * s1 + h2 * s2 + h3 * s3 + h4 * s4;
 }
 
@@ -1118,7 +1337,7 @@ static void render_sect(nm_ctx ctx, int len, nm_sample samples){
 				dfade = 1.0f / (attack * ctx->samples_per_sec);
 				vi->dfade = dfade;
 			}
-			else if (vc->released){
+			if (vc->released){
 				dfade = -1.0f / (decay * ctx->samples_per_sec);
 				vi->dfade = dfade;
 			}
@@ -1156,6 +1375,7 @@ static void render_sect(nm_ctx ctx, int len, nm_sample samples){
 			vc->cyctot += (int)vc->cyc;
 			vc->cyc = fmodf(vc->cyc, 1.0f);
 			vc->released = false;
+			vc_prev = &vc->next;
 			vc = vc->next;
 		}
 		else{
@@ -1163,6 +1383,7 @@ static void render_sect(nm_ctx ctx, int len, nm_sample samples){
 			nm_voice vcn = vc->next;
 			vc->next = ctx->voices_free;
 			ctx->voices_free = vc;
+			*vc_prev = vcn;
 			vc = vcn;
 		}
 	}
@@ -1177,6 +1398,18 @@ void nm_ctx_process(nm_ctx ctx, int sample_len, nm_sample samples){
 			// the next event is after these samples, so just render the rest and return
 			render_sect(ctx, sample_len - total_out, &samples[total_out]);
 			ctx->ticks += (double)(sample_len - total_out) / ctx->samples_per_tick;
+
+			for (int i = 0; i < 128; i++){
+				int cnt = ctx->notecnt[i];
+				if      (cnt == 0) printf(" ");
+				else if (cnt == 1) printf(".");
+				else if (cnt == 2) printf(":");
+				else if (cnt == 3) printf("&");
+				else if (cnt == 4) printf("#");
+				else               printf("@");
+			}
+			printf("|\n");
+
 			return;
 		}
 
@@ -1188,7 +1421,9 @@ void nm_ctx_process(nm_ctx ctx, int sample_len, nm_sample samples){
 		}
 
 		// process event
-		if (ev->type == NM_EV_RESET){
+		if (ev->type == NM_EV_NOP)
+			/* do nothing */;
+		else if (ev->type == NM_EV_RESET){
 		}
 		else if (ev->type == NM_EV_NOTEON){
 			nm_voice vc = ctx->voices_free;
@@ -1201,7 +1436,7 @@ void nm_ctx_process(nm_ctx ctx, int sample_len, nm_sample samples){
 				// initialize voice
 				nm_channel chan = &ctx->channels[ev->channel];
 				nm_patch pt = chan->patch;
-				uint8_t pstat = ctx->patchinf_status[chan->patch];
+				uint8_t pstat = ctx->patchinf_status[pt];
 				// 0 = unallocated, 1 = default synth, 2 = custom synth
 				if (pstat == 0){
 					// attempt to allocate patch
@@ -1230,7 +1465,7 @@ void nm_ctx_process(nm_ctx ctx, int sample_len, nm_sample samples){
 						else
 							pi->f_wave = wave_triangle;
 					}
-					ctx->patchinf_status[chan->patch] = pstat;
+					ctx->patchinf_status[pt] = pstat;
 				}
 				vc->f_render = pstat == 1 ? NULL : ctx->f_render;
 				vc->synth = ctx->synth;
@@ -1248,6 +1483,7 @@ void nm_ctx_process(nm_ctx ctx, int sample_len, nm_sample samples){
 				vc->dcyc = 1.0f / ((float)ctx->samples_per_sec / freq);
 				vc->down = true;
 				vc->released = false;
+				ctx->notecnt[ev->data1]++;
 			}
 		}
 		else if (ev->type == NM_EV_NOTEMOD){
@@ -1261,6 +1497,7 @@ void nm_ctx_process(nm_ctx ctx, int sample_len, nm_sample samples){
 					if (vc->down){
 						vc->down = false;
 						vc->released = true;
+						ctx->notecnt[ev->data1]--;
 					}
 					break;
 				}
@@ -1280,55 +1517,52 @@ void nm_ctx_process(nm_ctx ctx, int sample_len, nm_sample samples){
 		else if (ev->type == NM_EV_PATCH){
 		}
 
+		// advance read index
 		ctx->ev_read = (ctx->ev_read + 1) % ctx->ev_size;
 	}
-	/*
-		switch (ev->type){
-			case NM_NOTEOFF: {
-				nm_note_st *note = &ctx->chans[ev->u.noteoff.channel].notes[ev->u.noteoff.note];
-				if (note->down){
-					ctx->notedowns[ev->u.noteoff.note]--;
-					note->release = true;
-					note->down = false;
-					note->release_velocity = ev->u.noteoff.velocity;
-				}
-			} break;
-			case NM_NOTEON: {
-				nm_note_st *note = &ctx->chans[ev->u.noteon.channel].notes[ev->u.noteon.note];
-				if (!note->down){
-					ctx->notedowns[ev->u.noteon.note]++;
-					note->hit = true;
-					note->down = true;
-					note->hit_velocity = ev->u.noteon.velocity;
-				}
-			} break;
-			case NM_NOTEPRESSURE:
-				break;
-			case NM_CONTROLCHANGE:
-				break;
-			case NM_PROGRAMCHANGE:
-				break;
-			case NM_CHANNELPRESSURE:
-				break;
-			case NM_PITCHBEND:
-				break;
-			case NM_TEMPO:
-				ctx->ignore_timesig = true;
-				ctx->samples_per_tick = (ctx->samples_per_sec * ev->u.tempo.tempo) /
-					(1000000.0 * ctx->midi->ticks_per_q);
-				printf("TEMPO   samples per tick: %g\n", ctx->samples_per_tick);
-				break;
-			case NM_TIMESIG:
-				if (!ctx->ignore_timesig){
-					ctx->samples_per_tick = ctx->samples_per_sec /
-						(ctx->midi->ticks_per_q * 2.0 * pow(2.0, 2.0 - ev->u.timesig.den));
-					printf("TIMESIG  samples per tick: %g\n", ctx->samples_per_tick);
-				}
-				break;
+}
+
+void nm_ctx_dumpev(nm_ctx ctx){
+	int i = ctx->ev_read;
+	int cnt = 1;
+	while (i != ctx->ev_write){
+		nm_event ev = &ctx->events[i];
+		// print event
+		if (ev->type == NM_EV_NOP)
+			printf("%3d. [%08d] NOP\n", cnt, ev->tick);
+		else if (ev->type == NM_EV_RESET)
+			printf("%3d. [%08d] RESET    %u\n", cnt, ev->tick, ev->u.data2i);
+		else if (ev->type == NM_EV_NOTEON){
+			printf("%3d. [%08d] NOTEON   (%02X) %02X %g\n", cnt, ev->tick, ev->channel, ev->data1,
+				ev->u.data2f);
 		}
-		ctx->ev = (ev = ev->next);
+		else if (ev->type == NM_EV_NOTEMOD){
+			printf("%3d. [%08d] NOTEMOD  (%02X) %02X %g\n", cnt, ev->tick, ev->channel, ev->data1,
+				ev->u.data2f);
+		}
+		else if (ev->type == NM_EV_NOTEOFF)
+			printf("%3d. [%08d] NOTEOFF  (%02X) %02X\n", cnt, ev->tick, ev->channel, ev->data1);
+		else if (ev->type == NM_EV_CHANMOD)
+			printf("%3d. [%08d] CHANMOD  (%02X) %g\n", cnt, ev->tick, ev->channel, ev->u.data2f);
+		else if (ev->type == NM_EV_CHANBEND)
+			printf("%3d. [%08d] CHANBEND (%02X) %g\n", cnt, ev->tick, ev->channel, ev->u.data2f);
+		else if (ev->type == NM_EV_TEMPO)
+			printf("%3d. [%08d] TEMPO    %u\n", cnt, ev->tick, ev->u.data2i);
+		else if (ev->type == NM_EV_PATCH)
+			printf("%3d. [%08d] PATCH    (%02X) %u\n", cnt, ev->tick, ev->channel, ev->u.data2i);
+		else
+			printf("%3d. Unknown event: %02X\n", cnt, ev->type);
+		cnt++;
+		i = (i + 1) % ctx->ev_size;
 	}
-	*/
+}
+
+int nm_ctx_eventsleft(nm_ctx ctx){
+	if (ctx->ev_read == ctx->ev_write)
+		return 0;
+	if (ctx->ev_read > ctx->ev_write)
+		return ctx->ev_size - ctx->ev_read + ctx->ev_write;
+	return ctx->ev_write - ctx->ev_read;
 }
 
 void nm_ctx_free(nm_ctx ctx){

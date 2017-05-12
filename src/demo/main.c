@@ -88,22 +88,94 @@ void process_midi(const char *file){
 }
 
 #ifndef NDEBUG
-static void *db_alloc(size_t sz){
-	void *ptr = malloc(sz);
-	printf("alloc: %p (%zu)\n", ptr, sz);
-	return ptr;
+static SDL_sem *mem_lock;
+typedef struct m_debug_memlist_struct {
+	void *p;
+	struct m_debug_memlist_struct *next;
+} m_debug_memlist_st, *m_debug_memlist;
+static m_debug_memlist mem_list = NULL;
+
+void *db_alloc(size_t size){
+	void *p = malloc(size);
+	m_debug_memlist m = malloc(sizeof(m_debug_memlist_st));
+	m->p = p;
+	SDL_SemWait(mem_lock);
+	m->next = mem_list;
+	mem_list = m;
+	SDL_SemPost(mem_lock);
+	return p;
 }
 
-static void *db_realloc(void *ptr, size_t sz){
-	void *np = realloc(ptr, sz);
-	printf("realloc: %p -> %p (%zu)\n", ptr, np, sz);
-	return np;
+void *db_realloc(void *p, size_t size){
+	void *new_p;
+	if (p == NULL){
+		m_debug_memlist m = malloc(sizeof(m_debug_memlist_st));
+		m->p = new_p = malloc(size);
+		SDL_SemWait(mem_lock);
+		m->next = mem_list;
+		mem_list = m;
+		SDL_SemPost(mem_lock);
+	}
+	else{
+		SDL_SemWait(mem_lock);
+		m_debug_memlist m = mem_list;
+		bool found = false;
+		while (m){
+			if (m->p == p){
+				found = true;
+				m->p = new_p = realloc(p, size);
+				break;
+			}
+			m = m->next;
+		}
+		SDL_SemPost(mem_lock);
+		if (!found)
+			fprintf(stderr, "Reallocated a pointer that wasn't originally allocated\n");
+	}
+	return new_p;
 }
 
-static void db_free(void *ptr){
-	free(ptr);
-	printf("free: %p\n", ptr);
+void db_free(void *p){
+	if (p == NULL)
+		return;
+	SDL_SemWait(mem_lock);
+	m_debug_memlist *m = &mem_list;
+	bool found = false;
+	while (*m){
+		if ((*m)->p == p){
+			found = true;
+			free(p);
+			void *f = *m;
+			*m = (*m)->next;
+			free(f);
+			break;
+		}
+		m = &(*m)->next;
+	}
+	SDL_SemPost(mem_lock);
+	if (!found)
+		fprintf(stderr, "Freeing a pointer that wasn't originally allocated\n");
 }
+
+void db_flush(){
+	SDL_SemWait(mem_lock);
+	m_debug_memlist m = mem_list;
+	int count = 0;
+	while (m){
+		count++;
+		void *f = m;
+		m = m->next;
+		free(f);
+	}
+	SDL_SemPost(mem_lock);
+	if (count == 0)
+		fprintf(stderr, "No memory leaks :-)\n");
+	else
+		fprintf(stderr, "%d memory leak%s\n", count, count == 1 ? "" : "s");
+}
+
+
+
 #endif
 
 SDL_sem *lock_write;
@@ -113,26 +185,26 @@ bool render_done = false;
 
 int sdl_render_audio(void *data){
 	nm_ctx ctx = (nm_ctx)data;
-	while (true){
+	while (nm_ctx_eventsleft(ctx) > 0){
 		SDL_SemWait(lock_write);
 		memset(sample_buffer, 0, sizeof(nm_sample_st) * sample_buffer_size);
 		nm_ctx_process(ctx, sample_buffer_size, sample_buffer);
 		#ifndef NDEBUG
 		// crappy click detection
-		if (sz > 0){
-			float pL = sample_buffer[0].L;
-			float pR = sample_buffer[0].R;
-			for (int i = 1; i < sz; i++){
-				float nL = sample_buffer[i].L;
-				float nR = sample_buffer[i].R;
-				float dL = fabsf(nL - pL);
-				float dR = fabsf(nR - pR);
-				if (dL > 0.1f || dR > 0.1f)
-					printf("click!\n");
-				pL = nL;
-				pR = nR;
-			}
+		#if 0
+		float pL = sample_buffer[0].L;
+		float pR = sample_buffer[0].R;
+		for (int i = 1; i < sample_buffer_size; i++){
+			float nL = sample_buffer[i].L;
+			float nR = sample_buffer[i].R;
+			float dL = fabsf(nL - pL);
+			float dR = fabsf(nR - pR);
+			if (dL > 0.1f || dR > 0.1f)
+				printf("click!\n");
+			pL = nL;
+			pR = nR;
 		}
+		#endif
 		#endif
 		SDL_SemPost(lock_read);
 	}
@@ -155,7 +227,9 @@ void sdl_copy_audio(void *userdata, Uint8* stream, int len){
 
 int main(int argc, char **argv){
 	#ifndef NDEBUG
+	SDL_Init(SDL_INIT_AUDIO);
 	printf("Debug Build\n");
+	mem_lock = SDL_CreateSemaphore(1);
 	nm_alloc = db_alloc;
 	nm_realloc = db_realloc;
 	nm_free = db_free;
@@ -166,6 +240,10 @@ int main(int argc, char **argv){
 
 	if (argc < 2){
 		printf("Usage: ./nightmare file.mid\n");
+		#ifndef NDEBUG
+		SDL_DestroySemaphore(mem_lock);
+		SDL_Quit();
+		#endif
 		return 0;
 	}
 //	process_midi(argv[1]);
@@ -186,34 +264,33 @@ int main(int argc, char **argv){
 	nm_ctx ctx = nm_ctx_new(480, 256, 32, 48000, NULL, 0, 0, NULL, NULL);
 	if (ctx == NULL){
 		fprintf(stderr, "Out of memory\n");
+		#ifndef NDEBUG
+		SDL_DestroySemaphore(mem_lock);
+		SDL_Quit();
+		#endif
 		return 1;
 	}
 
-	nm_ctx_free(ctx);
-	return 0;
-#if 0
-	nm_midi midi = nm_midi_newfile(argv[1], midi_warn, NULL);
-	if (midi == NULL){
-		fprintf(stderr, "Failed to load MIDI file: %s\n", argv[1]);
+	if (!nm_midi_newfile(ctx, argv[1], midi_warn, NULL)){
+		fprintf(stderr, "Failed to process midi file: %s\n", argv[1]);
 		return 1;
 	}
 
-	{
-		int ev_count = 0;
-		nm_event here = midi->tracks[0];
-		while (here){
-			ev_count++;
-			here = here->next;
-		}
-		printf("Total Events: %d\n", ev_count);
-	}
-
-	nm_ctx ctx = nm_ctx_new(midi, 0, 32, 48000);
-	if (ctx == NULL){
+	if (!nm_ctx_bakeall(ctx)){
 		fprintf(stderr, "Out of memory\n");
+		#ifndef NDEBUG
+		SDL_DestroySemaphore(mem_lock);
+		SDL_Quit();
+		#endif
 		return 1;
 	}
+
+	//nm_ctx_dumpev(ctx);
+
+	#ifdef NDEBUG
 	SDL_Init(SDL_INIT_AUDIO);
+	#endif
+
 	SDL_AudioSpec want, have;
 	SDL_AudioDeviceID dev;
 	SDL_memset(&want, 0, sizeof(want));
@@ -247,9 +324,12 @@ int main(int argc, char **argv){
 		}
 		SDL_CloseAudioDevice(dev);
 	}
-	SDL_Quit();
+
 	nm_ctx_free(ctx);
-	nm_midi_free(midi);
+	#ifndef NDEBUG
+	db_flush();
+	SDL_DestroySemaphore(mem_lock);
+	#endif
+	SDL_Quit();
 	return 0;
-#endif
 }

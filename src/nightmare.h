@@ -55,6 +55,7 @@ typedef bool (*nm_synth_render_func)(nm_ctx ctx, nm_voice voice, int len, nm_sam
 // API
 //
 
+// functions that return bool will return true on success and false for failure (out of memory)
 nm_ctx      nm_ctx_new(uint16_t ticks_per_quarternote, uint16_t channels, int voices,
 	int samples_per_sec, void *synth, size_t sizeof_patchinf, size_t sizeof_voiceinf,
 	nm_synth_patch_setup_func f_patch_setup, nm_synth_render_func f_render);
@@ -64,17 +65,21 @@ bool        nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_
 const char *nm_patch_str(nm_patch p);
 nm_patchcat nm_patch_category(nm_patch p);
 const char *nm_patchcat_str(nm_patchcat pc);
-void        nm_ev_reset(nm_ctx ctx, uint32_t tick, uint16_t ticks_per_quarternote);
-void        nm_ev_noteon(nm_ctx ctx, uint32_t tick, uint16_t channel, uint8_t note, float vel);
-void        nm_ev_notemod(nm_ctx ctx, uint32_t tick, uint16_t channel, uint8_t note, float mod);
-void        nm_ev_noteoff(nm_ctx ctx, uint32_t tick, uint16_t channel, uint8_t note);
-void        nm_ev_chanmod(nm_ctx ctx, uint32_t tick, uint16_t channel, float mod);
-void        nm_ev_chanbend(nm_ctx ctx, uint32_t tick, uint16_t channel, float bend);
-void        nm_ev_tempo(nm_ctx ctx, uint32_t tick, uint32_t usec_per_quarternote);
-void        nm_ev_patch(nm_ctx ctx, uint32_t tick, uint16_t channel, nm_patch patch);
-void        nm_ctx_bake(nm_ctx ctx, uint32_t ticks);
+bool        nm_ev_nop(nm_ctx ctx, uint32_t tick);
+bool        nm_ev_reset(nm_ctx ctx, uint32_t tick, uint16_t ticks_per_quarternote);
+bool        nm_ev_noteon(nm_ctx ctx, uint32_t tick, uint16_t channel, uint8_t note, float vel);
+bool        nm_ev_notemod(nm_ctx ctx, uint32_t tick, uint16_t channel, uint8_t note, float mod);
+bool        nm_ev_noteoff(nm_ctx ctx, uint32_t tick, uint16_t channel, uint8_t note);
+bool        nm_ev_chanmod(nm_ctx ctx, uint32_t tick, uint16_t channel, float mod);
+bool        nm_ev_chanbend(nm_ctx ctx, uint32_t tick, uint16_t channel, float bend);
+bool        nm_ev_tempo(nm_ctx ctx, uint32_t tick, uint32_t usec_per_quarternote);
+bool        nm_ev_patch(nm_ctx ctx, uint32_t tick, uint16_t channel, nm_patch patch);
+bool        nm_ctx_bake(nm_ctx ctx, uint32_t ticks);
+bool        nm_ctx_bakeall(nm_ctx ctx);
 void        nm_ctx_clear(nm_ctx ctx);
 void        nm_ctx_process(nm_ctx ctx, int sample_len, nm_sample samples);
+void        nm_ctx_dumpev(nm_ctx ctx);
+int         nm_ctx_eventsleft(nm_ctx ctx);
 void        nm_ctx_free(nm_ctx ctx);
 
 //
@@ -381,6 +386,7 @@ enum nm_patch_enum {
 };
 
 enum nm_event_type_enum {
+	NM_EV_NOP,
 	NM_EV_RESET,
 	NM_EV_NOTEON,
 	NM_EV_NOTEMOD,
@@ -407,7 +413,6 @@ struct nm_event_struct {
 };
 
 struct nm_wevent_struct {
-	nm_wevent prev;
 	nm_wevent next;
 	nm_event_st ev;
 };
@@ -476,6 +481,7 @@ struct nm_ctx_struct {
 	uint16_t channel_count;
 	uint8_t patchinf_status[NM__PATCH_END]; // 0 = unallocated, 1 = default synth, 2 = custom synth
 	void *patchinf[NM__PATCH_END];
+	int notecnt[128];
 };
 
 struct nm_sample_struct {
