@@ -310,6 +310,15 @@ nm_ctx nm_ctx_new(uint16_t ticks_per_quarternote, uint16_t channels, int voices,
 	if (ctx == NULL)
 		return NULL;
 
+	ctx->events = NULL;
+	ctx->channels = NULL;
+	ctx->voices_free = NULL;
+	ctx->voices_used = NULL;
+	memset(ctx->patchinf, 0, sizeof(void *) * NM__PATCH_END);
+	ctx->wevents = NULL;
+	ctx->last_wevent = NULL;
+	ctx->ins_wevent = NULL;
+
 	ctx->synth = synth;
 	ctx->f_patch_setup = f_patch_setup;
 	ctx->f_render = f_render;
@@ -318,14 +327,8 @@ nm_ctx nm_ctx_new(uint16_t ticks_per_quarternote, uint16_t channels, int voices,
 	ctx->ev_write = 0;
 	ctx->ev_size = 200;
 	ctx->events = nm_alloc(sizeof(nm_event_st) * ctx->ev_size);
-	if (ctx->events == NULL){
-		nm_free(ctx);
-		return NULL;
-	}
-
-	ctx->wevents = NULL;
-	ctx->last_wevent = NULL;
-	ctx->ins_wevent = NULL;
+	if (ctx->events == NULL)
+		goto cleanup;
 
 	ctx->samples_per_sec = samples_per_sec;
 	ctx->ticks = 0;
@@ -333,11 +336,8 @@ nm_ctx nm_ctx_new(uint16_t ticks_per_quarternote, uint16_t channels, int voices,
 
 	ctx->channel_count = channels;
 	ctx->channels = nm_alloc(sizeof(nm_channel_st) * channels);
-	if (ctx->channels == NULL){
-		nm_free(ctx->events);
-		nm_free(ctx);
-		return NULL;
-	}
+	if (ctx->channels == NULL)
+		goto cleanup;
 	for (int i = 0; i < channels; i++){
 		ctx->channels[i].patch = NM_PIANO_ACGR; // TODO: what is proper intialization?
 		ctx->channels[i].mod = 0;
@@ -346,33 +346,15 @@ nm_ctx nm_ctx_new(uint16_t ticks_per_quarternote, uint16_t channels, int voices,
 
 	if (sizeof_voiceinf < sizeof(nm_defvoiceinf_st))
 		sizeof_voiceinf = sizeof(nm_defvoiceinf_st);
-	ctx->voices_free = NULL;
-	ctx->voices_used = NULL;
 	for (int i = 0; i < voices; i++){
 		nm_voice vc = nm_alloc(sizeof(nm_voice_st));
 		if (vc == NULL)
-			goto vc_cleanup;
-		vc->voiceinf = nm_alloc(sizeof_voiceinf);
-		if (vc->voiceinf == NULL){
-			nm_free(vc);
-			goto vc_cleanup;
-		}
+			goto cleanup;
 		vc->next = ctx->voices_free;
 		ctx->voices_free = vc;
-		continue;
-
-		vc_cleanup:
-		vc = ctx->voices_free;
-		while (vc){
-			nm_voice del = vc;
-			vc = vc->next;
-			nm_free(del->voiceinf);
-			nm_free(del);
-		}
-		nm_free(ctx->channels);
-		nm_free(ctx->events);
-		nm_free(ctx);
-		return NULL;
+		vc->voiceinf = nm_alloc(sizeof_voiceinf);
+		if (vc->voiceinf == NULL)
+			goto cleanup;
 	}
 
 	memset(ctx->patchinf_status, 0, sizeof(uint8_t) * NM__PATCH_END);
@@ -382,18 +364,6 @@ nm_ctx nm_ctx_new(uint16_t ticks_per_quarternote, uint16_t channels, int voices,
 	for (int i = 0; i < NM__PATCH_END; i++){
 		ctx->patchinf[i] = nm_alloc(sizeof_patchinf);
 		if (ctx->patchinf[i] == NULL){
-			for (int j = 0; j < i; j++)
-				nm_free(ctx->patchinf[j]);
-			nm_voice vc = ctx->voices_free;
-			while (vc){
-				nm_voice del = vc;
-				vc = vc->next;
-				nm_free(del->voiceinf);
-				nm_free(del);
-			}
-			nm_free(ctx->channels);
-			nm_free(ctx->events);
-			nm_free(ctx);
 			return NULL;
 		}
 	}
@@ -401,6 +371,26 @@ nm_ctx nm_ctx_new(uint16_t ticks_per_quarternote, uint16_t channels, int voices,
 	memset(ctx->notecnt, 0, sizeof(int) * 128);
 
 	return ctx;
+
+	cleanup:
+	for (int i = 0; i < NM__PATCH_END; i++){
+		if (ctx->patchinf[i])
+			nm_free(ctx->patchinf[i]);
+	}
+	nm_voice vc = ctx->voices_free;
+	while (vc){
+		nm_voice del = vc;
+		vc = vc->next;
+		if (del->voiceinf)
+			nm_free(del->voiceinf);
+		nm_free(del);
+	}
+	if (ctx->channels)
+		nm_free(ctx->channels);
+	if (ctx->events)
+		nm_free(ctx->events);
+	nm_free(ctx);
+	return NULL;
 }
 
 static void warn(nm_warn_func f_warn, void *user, const char *fmt, ...){
@@ -701,8 +691,12 @@ bool nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_
 								"in track %d", vel, track_i);
 							vel ^= 0x80;
 						}
-						nm_ev_noteon(ctx, ticks, chan_base + (msg & 0xF), note,
-							vel == 0x40 ? 0.5f : (float)vel / 127.0f);
+						if (vel == 0)
+							nm_ev_noteoff(ctx, ticks, chan_base + (msg & 0xF), note);
+						else{
+							nm_ev_noteon(ctx, ticks, chan_base + (msg & 0xF), note,
+								vel == 0x40 ? 0.5f : (float)vel / 127.0f);
+						}
 					}
 					else if (msg >= 0xA0 && msg < 0xB0){ // Note Pressure
 						if (p + 1 >= p_end){
@@ -1403,12 +1397,8 @@ void nm_ctx_process(nm_ctx ctx, int sample_len, nm_sample samples){
 	while (ctx->ev_read != ctx->ev_write){
 		nm_event ev = &ctx->events[ctx->ev_read];
 		double next_ev_sample = round(((double)ev->tick - ctx->ticks) * ctx->samples_per_tick);
-		if (next_ev_sample > sample_len - total_out){
-			// the next event is after these samples, so just render the rest and return
-			render_sect(ctx, sample_len - total_out, &samples[total_out]);
-			ctx->ticks += (double)(sample_len - total_out) / ctx->samples_per_tick;
-			return;
-		}
+		if (next_ev_sample > sample_len - total_out)
+			break;
 
 		if (next_ev_sample > 0){
 			// render before the event
@@ -1499,12 +1489,10 @@ void nm_ctx_process(nm_ctx ctx, int sample_len, nm_sample samples){
 			// search for the right note/channel and turn it off
 			nm_voice vc = ctx->voices_used;
 			while (vc){
-				if (vc->channel == ev->channel && vc->note == ev->data1){
-					if (vc->down){
-						vc->down = false;
-						vc->released = true;
-						ctx->notecnt[ev->data1]--;
-					}
+				if (vc->channel == ev->channel && vc->note == ev->data1 && vc->down){
+					vc->down = false;
+					vc->released = true;
+					ctx->notecnt[ev->data1]--;
 					break;
 				}
 				vc = vc->next;
@@ -1527,6 +1515,9 @@ void nm_ctx_process(nm_ctx ctx, int sample_len, nm_sample samples){
 		// advance read index
 		ctx->ev_read = (ctx->ev_read + 1) % ctx->ev_size;
 	}
+	// the next event is after these samples, so just render the rest and return
+	render_sect(ctx, sample_len - total_out, &samples[total_out]);
+	ctx->ticks += (double)(sample_len - total_out) / ctx->samples_per_tick;
 }
 
 void nm_ctx_dumpev(nm_ctx ctx){
@@ -1570,6 +1561,16 @@ int nm_ctx_eventsleft(nm_ctx ctx){
 	if (ctx->ev_read > ctx->ev_write)
 		return ctx->ev_size - ctx->ev_read + ctx->ev_write;
 	return ctx->ev_write - ctx->ev_read;
+}
+
+int nm_ctx_voicesleft(nm_ctx ctx){
+	int cnt = 0;
+	nm_voice vc = ctx->voices_used;
+	while (vc){
+		cnt++;
+		vc = vc->next;
+	}
+	return cnt;
 }
 
 void nm_ctx_free(nm_ctx ctx){

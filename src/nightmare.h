@@ -80,6 +80,7 @@ void        nm_ctx_clear(nm_ctx ctx);
 void        nm_ctx_process(nm_ctx ctx, int sample_len, nm_sample samples);
 void        nm_ctx_dumpev(nm_ctx ctx);
 int         nm_ctx_eventsleft(nm_ctx ctx);
+int         nm_ctx_voicesleft(nm_ctx ctx);
 void        nm_ctx_free(nm_ctx ctx);
 
 //

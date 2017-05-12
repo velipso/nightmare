@@ -186,7 +186,7 @@ bool render_done = false;
 
 int sdl_render_audio(void *data){
 	nm_ctx ctx = (nm_ctx)data;
-	while (nm_ctx_eventsleft(ctx) > 0){
+	while (nm_ctx_eventsleft(ctx) > 0 || nm_ctx_voicesleft(ctx) > 0){
 		SDL_SemWait(lock_write);
 		memset(sample_buffer, 0, sizeof(nm_sample_st) * sample_buffer_size);
 		nm_ctx_process(ctx, sample_buffer_size, sample_buffer);
@@ -199,7 +199,7 @@ int sdl_render_audio(void *data){
 			else if (cnt == 4) printf("#");
 			else               printf("@");
 		}
-		printf("|\n");
+		printf("%2X\n", nm_ctx_voicesleft(ctx));
 		#ifndef NDEBUG
 		// crappy click detection
 		#if 0
