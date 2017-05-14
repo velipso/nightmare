@@ -1,3 +1,23 @@
 
+include 'nightmare' # required
+using music
+
 say 'A simple piano diddy written in sink'
 
+/*
+# list all the instruments
+for var i: range _PATCH_END
+	say (str.pad i, -3), (str.pad (patchname i), 40), patchcat i
+end
+# */
+
+#/*
+# list all the notes
+for var i: range 128
+	var n = note i
+	say (str.pad i, -3), n, (note n), note list.join n, ''
+end
+# */
+
+
+say note 'A4'

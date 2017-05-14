@@ -981,7 +981,7 @@ bool nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_
 
 const char *nm_patch_str(nm_patch p){
 	switch (p){
-		#define X(en, code, str) case en: return str;
+		#define X(en, code, str) case NM_ ## en: return str;
 		NM_EACH_PATCH(X)
 		#undef X
 		case NM__PATCH_END: break;
@@ -991,7 +991,7 @@ const char *nm_patch_str(nm_patch p){
 
 static int nm_patch_code(nm_patch p){
 	switch (p){
-		#define X(en, code, str) case en: return code;
+		#define X(en, code, str) case NM_ ## en: return code;
 		NM_EACH_PATCH(X)
 		#undef X
 		case NM__PATCH_END: break;
