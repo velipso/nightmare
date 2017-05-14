@@ -408,6 +408,12 @@ static void warn(nm_warn_func f_warn, void *user, const char *fmt, ...){
 	nm_free(buf);
 }
 
+bool nm_ismidi(uint8_t data[8]){
+	return
+		data[0] == 'M' && data[1] == 'T' && data[2] == 'h' && data[3] == 'd' &&
+		data[4] ==  0  && data[5] ==  0  && data[6] ==  0  && data[7] >= 6;
+}
+
 bool nm_midi_newfile(nm_ctx ctx, const char *file, nm_warn_func f_warn, void *user){
 	FILE *fp = fopen(file, "rb");
 	if (fp == NULL)

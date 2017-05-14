@@ -4,6 +4,7 @@
 
 #include "SDL.h"
 #include "../nightmare.h"
+#include "../sink_nightmare.h"
 
 #include <stdio.h>
 #include <stdbool.h>
@@ -11,6 +12,13 @@
 #include <string.h>
 #include <dirent.h>
 #include <sys/stat.h>
+
+#ifdef SINK_WIN32 // TODO: test on win32
+#	include <direct.h> // _getcwd
+#	define getcwd _getcwd
+#else
+#	include <unistd.h> // getcwd
+#endif
 
 const int sample_buffer_size = 1024;
 
@@ -56,6 +64,35 @@ static void fs_readdir(const char *dir, fs_readdir_each_func f_each){
 		closedir(dp);
 	}
 }
+
+static sink_fstype fs_sinktype(const char *file, void *user){
+	if (fs_isdir(file))
+		return SINK_FSTYPE_DIR;
+	else if (fs_isfile(file))
+		return SINK_FSTYPE_FILE;
+	return SINK_FSTYPE_NONE;
+}
+
+static bool fs_sinkread(sink_scr scr, const char *file, void *user){
+	FILE *fp = fopen(file, "rb");
+	if (fp == NULL)
+		return false; // `false` indicates that the file couldn't be read
+	char buf[5000];
+	while (!feof(fp)){
+		size_t sz = fread(buf, 1, sizeof(buf), fp);
+		if (!sink_scr_write(scr, sz, (const uint8_t *)buf))
+			break;
+	}
+	fclose(fp);
+	return true; // `true` indicates that the file was read
+}
+
+static sink_inc_st inc = {
+	.f_fixpath = NULL,
+	.f_fstype = fs_sinktype,
+	.f_fsread = fs_sinkread,
+	.user = NULL
+};
 
 void process_midi(const char *file);
 void each_midi(const char *file){
@@ -237,7 +274,24 @@ void sdl_copy_audio(void *userdata, Uint8* stream, int len){
 }
 
 int main(int argc, char **argv){
+	// z/Zelda3ocarina.mid              // very small and simple
+	// f/For_Those_About_To_Rock.MID    // 0-size MTrk
+	// TODO:
+	//  pitch bends (coarse and fine grained)
+	//  understand control changes
+	//  drums
+	//  poly mode
+	//  omni mode should perform all notes on/off because GM2 doesn't use omni mode
+//	each_midi("/Users/sean/Downloads/midi/data");
+//	return 0;
+
+	int res = 1;
+	nm_ctx nctx = NULL;
+	bool sdl_init = false;
+	FILE *fp = NULL;
+
 	#ifndef NDEBUG
+	sdl_init = true;
 	SDL_Init(SDL_INIT_AUDIO);
 	printf("Debug Build\n");
 	mem_lock = SDL_CreateSemaphore(1);
@@ -246,61 +300,79 @@ int main(int argc, char **argv){
 	nm_free = db_free;
 	#endif
 
-//	each_midi("/Users/sean/Downloads/midi/data");
-//	return 0;
-
 	if (argc < 2){
-		printf("Usage: ./nightmare file.mid\n");
-		#ifndef NDEBUG
-		SDL_DestroySemaphore(mem_lock);
-		SDL_Quit();
-		#endif
-		return 0;
+		printf(
+			"Usage:\n"
+			"  nightmare file.mid        Play a MIDI file\n"
+			"  nightmare file.sink       Execute a sink script\n");
+		res = 0;
+		goto cleanup;
 	}
-//	process_midi(argv[1]);
-//	return 0;
 
-	// z/Zelda3ocarina.mid              // very small and simple
-	// f/For_Those_About_To_Rock.MID    // 0-size MTrk
+	// read start of file to see if it's a MIDI file
+	fp = fopen(argv[1], "rb");
+	if (fp == NULL){
+		fprintf(stderr, "Failed to read file: %s\n", argv[1]);
+		goto cleanup;
+	}
+	uint8_t filedata[8] = {0};
+	fread(filedata, 1, 8, fp);
+	fclose(fp);
+	fp = NULL;
+	bool is_midi = nm_ismidi(filedata);
 
-	// TODO:
-	//  pitch bends (coarse and fine grained)
-	//  understand control changes
-	//  drums
-	//  poly mode
-	//  omni mode should perform all notes on/off because GM2 doesn't use omni mode
-
-	nm_ctx ctx = nm_ctx_new(480, 1024, 32, 48000, NULL, 0, 0, NULL, NULL);
-	if (ctx == NULL){
+	// create a nightmare context
+	nctx = nm_ctx_new(480, 1024, 32, 48000, NULL, 0, 0, NULL, NULL);
+	if (nctx == NULL){
 		fprintf(stderr, "Out of memory\n");
-		#ifndef NDEBUG
-		SDL_DestroySemaphore(mem_lock);
-		SDL_Quit();
-		#endif
-		return 1;
+		goto cleanup;
 	}
 
-	if (!nm_midi_newfile(ctx, argv[1], midi_warn, NULL)){
-		fprintf(stderr, "Failed to process midi file: %s\n", argv[1]);
-		#ifndef NDEBUG
-		SDL_DestroySemaphore(mem_lock);
-		SDL_Quit();
-		#endif
-		return 1;
+	if (is_midi){
+		if (!nm_midi_newfile(nctx, argv[1], midi_warn, NULL)){
+			fprintf(stderr, "Failed to process midi file: %s\n", argv[1]);
+			goto cleanup;
+		}
+	}
+	else{
+		char *cwd = getcwd(NULL, 0);
+		sink_scr scr = sink_scr_new(inc, cwd, SINK_SCR_FILE);
+		free(cwd);
+		sink_scr_addpath(scr, ".");
+		sink_nightmare_scr(scr);
+
+		if (!sink_scr_loadfile(scr, argv[1])){
+			const char *err = sink_scr_err(scr);
+			fprintf(stderr, "%s\n", err ? err : "Error: Unknown");
+			sink_scr_free(scr);
+			goto cleanup;
+		}
+
+		sink_ctx sctx = sink_ctx_new(scr, sink_stdio);
+		sink_nightmare_ctx(sctx, nctx);
+
+		sink_run res = sink_ctx_run(sctx);
+		if (res == SINK_RUN_FAIL){
+			const char *err = sink_ctx_err(sctx);
+			fprintf(stderr, "%s\n", err ? err : "Error: Unknown");
+			sink_ctx_free(sctx);
+			sink_scr_free(scr);
+			goto cleanup;
+		}
+
+		sink_ctx_free(sctx);
+		sink_scr_free(scr);
 	}
 
-	if (!nm_ctx_bakeall(ctx)){
+	if (!nm_ctx_bakeall(nctx)){
 		fprintf(stderr, "Out of memory\n");
-		#ifndef NDEBUG
-		SDL_DestroySemaphore(mem_lock);
-		SDL_Quit();
-		#endif
-		return 1;
+		goto cleanup;
 	}
 
-	//nm_ctx_dumpev(ctx);
+	//nm_ctx_dumpev(nctx);
 
 	#ifdef NDEBUG
+	sdl_init = true;
 	SDL_Init(SDL_INIT_AUDIO);
 	#endif
 
@@ -324,7 +396,7 @@ int main(int argc, char **argv){
 			if (lock_read == NULL)
 				fprintf(stderr, "Failed to create semaphore: %s\n", SDL_GetError());
 			else{
-				SDL_Thread *thr = SDL_CreateThread(sdl_render_audio, "Nightmare Audio", ctx);
+				SDL_Thread *thr = SDL_CreateThread(sdl_render_audio, "Nightmare Audio", nctx);
 				if (thr == NULL)
 					fprintf(stderr, "Failed to create thread: %s\n", SDL_GetError());
 				else{
@@ -342,15 +414,20 @@ int main(int argc, char **argv){
 		SDL_CloseAudioDevice(dev);
 	}
 
-	nm_ctx_free(ctx);
+	cleanup:
+	if (fp)
+		fclose(fp);
+	if (nctx)
+		nm_ctx_free(nctx);
 	#ifndef NDEBUG
 	db_flush();
 	SDL_DestroySemaphore(mem_lock);
 	#endif
-	SDL_Quit();
+	if (sdl_init)
+		SDL_Quit();
 	#ifndef NDEBUG
 	printf("hit a key to exit\n");
 	fgetc(stdin);
 	#endif
-	return 0;
+	return res;
 }

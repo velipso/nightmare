@@ -3,6 +3,7 @@
 // Project Home: https://github.com/voidqk/nightmare
 
 #ifndef NIGHTMARE__H
+#define NIGHTMARE__H
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -59,6 +60,7 @@ typedef bool (*nm_synth_render_func)(nm_ctx ctx, nm_voice voice, int len, nm_sam
 nm_ctx      nm_ctx_new(uint16_t ticks_per_quarternote, uint16_t channels, int voices,
 	int samples_per_sec, void *synth, size_t sizeof_patchinf, size_t sizeof_voiceinf,
 	nm_synth_patch_setup_func f_patch_setup, nm_synth_render_func f_render);
+bool        nm_ismidi(uint8_t data[8]);
 bool        nm_midi_newfile(nm_ctx ctx, const char *file, nm_warn_func f_warn, void *user);
 bool        nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_warn,
 	void *user);
