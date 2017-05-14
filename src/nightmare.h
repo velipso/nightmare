@@ -76,6 +76,8 @@ bool        nm_ev_chanmod(nm_ctx ctx, uint32_t tick, uint16_t channel, float mod
 bool        nm_ev_chanbend(nm_ctx ctx, uint32_t tick, uint16_t channel, float bend);
 bool        nm_ev_tempo(nm_ctx ctx, uint32_t tick, uint32_t usec_per_quarternote);
 bool        nm_ev_patch(nm_ctx ctx, uint32_t tick, uint16_t channel, nm_patch patch);
+void        nm_defpatch(nm_patch patch, uint8_t wave, float peak, float attack, float decay,
+	float sustain, float harmonic1, float harmonic2, float harmonic3, float harmonic4);
 bool        nm_ctx_bake(nm_ctx ctx, uint32_t ticks);
 bool        nm_ctx_bakeall(nm_ctx ctx);
 void        nm_ctx_clear(nm_ctx ctx);

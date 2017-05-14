@@ -280,6 +280,47 @@ static sink_val L_patch(sink_ctx ctx, int size, sink_val *args, nm_user u){
 	return sink_bool(true);
 }
 
+static sink_val L_defpatch(sink_ctx ctx, int size, sink_val *args, nm_user u){
+	double patch, wave, peak, attack, decay, sustain, h1, h2, h3, h4;
+	if (!sink_arg_num(ctx, size, args, 0, &patch  ) ||
+		!sink_arg_num(ctx, size, args, 1, &wave   ) ||
+		!sink_arg_num(ctx, size, args, 2, &peak   ) ||
+		!sink_arg_num(ctx, size, args, 3, &attack ) ||
+		!sink_arg_num(ctx, size, args, 4, &decay  ) ||
+		!sink_arg_num(ctx, size, args, 5, &sustain) ||
+		!sink_arg_num(ctx, size, args, 6, &h1     ) ||
+		!sink_arg_num(ctx, size, args, 7, &h2     ) ||
+		!sink_arg_num(ctx, size, args, 8, &h3     ) ||
+		!sink_arg_num(ctx, size, args, 9, &h4     ))
+		return SINK_NIL;
+	int p = (int)patch;
+	if (p < 0 || p >= 256 || p != patch)
+		return sink_abortcstr(ctx, "Invalid patch (expecting 0-255)");
+	uint8_t w = (uint8_t)wave;
+	if (w < 0 || w >= 4 || w != wave)
+		return sink_abortcstr(ctx, "Invalid wave (expecting 0-3)");
+	nm_defpatch(p, w, peak, attack, decay, sustain, h1, h2, h3, h4);
+	return sink_bool(true);
+}
+
+static sink_val L_bake(sink_ctx ctx, int size, sink_val *args, nm_user u){
+	double ticks;
+	if (!sink_arg_num(ctx, size, args, 0, &ticks))
+		return SINK_NIL;
+	uint32_t t = (uint32_t)ticks;
+	if (t != ticks)
+		return sink_abortcstr(ctx, "Invalid ticks; expecting integers");
+	if (!nm_ctx_bake(u->ctx, t))
+		return sink_abortcstr(ctx, "Failed to bake notes");
+	return sink_bool(true);
+}
+
+static sink_val L_bakeall(sink_ctx ctx, int size, sink_val *args, nm_user u){
+	if (!nm_ctx_bakeall(u->ctx))
+		return sink_abortcstr(ctx, "Failed to bake notes");
+	return sink_bool(true);
+}
+
 void sink_nightmare_scr(sink_scr scr){
 	sink_scr_inc(scr, "nightmare",
 		"namespace music;"
@@ -319,6 +360,9 @@ void sink_nightmare_scr(sink_scr scr){
 		"declare noteplay  'nightmare.noteplay' ;"
 		"declare tempo     'nightmare.tempo'    ;"
 		"declare patch     'nightmare.patch'    ;"
+		"declare defpatch  'nightmare.defpatch' ;"
+		"declare bake      'nightmare.bake'     ;"
+		"declare bakeall   'nightmare.bakeall'  ;"
 		"end"
 	);
 }
@@ -339,5 +383,8 @@ bool sink_nightmare_ctx(sink_ctx ctx, nm_ctx nctx){
 	sink_ctx_native(ctx, "nightmare.noteplay" , u, (sink_native_func)L_noteplay );
 	sink_ctx_native(ctx, "nightmare.tempo"    , u, (sink_native_func)L_tempo    );
 	sink_ctx_native(ctx, "nightmare.patch"    , u, (sink_native_func)L_patch    );
+	sink_ctx_native(ctx, "nightmare.defpatch" , u, (sink_native_func)L_defpatch );
+	sink_ctx_native(ctx, "nightmare.bake"     , u, (sink_native_func)L_bake     );
+	sink_ctx_native(ctx, "nightmare.bakeall"  , u, (sink_native_func)L_bakeall  );
 	return true;
 }

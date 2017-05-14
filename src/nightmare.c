@@ -1201,6 +1201,19 @@ bool nm_ev_patch(nm_ctx ctx, uint32_t tick, uint16_t channel, nm_patch patch){
 	return true;
 }
 
+void nm_defpatch(nm_patch patch, uint8_t wave, float peak, float attack, float decay,
+	float sustain, float harmonic1, float harmonic2, float harmonic3, float harmonic4){
+	melodicpatch[patch].wave      = wave     ;
+	melodicpatch[patch].peak      = peak     ;
+	melodicpatch[patch].attack    = attack   ;
+	melodicpatch[patch].decay     = decay    ;
+	melodicpatch[patch].sustain   = sustain  ;
+	melodicpatch[patch].harmonic1 = harmonic1;
+	melodicpatch[patch].harmonic2 = harmonic2;
+	melodicpatch[patch].harmonic3 = harmonic3;
+	melodicpatch[patch].harmonic4 = harmonic4;
+}
+
 bool nm_ctx_bake(nm_ctx ctx, uint32_t ticks){
 	// count how many events we need to insert
 	int evtot = 0;
