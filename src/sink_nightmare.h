@@ -11,6 +11,6 @@
 #include "nightmare.h"
 
 void sink_nightmare_scr(sink_scr scr);
-void sink_nightmare_ctx(sink_ctx ctx, nm_ctx nctx);
+bool sink_nightmare_ctx(sink_ctx ctx, nm_ctx nctx); // returns false for out of memory
 
 #endif // SINK_NIGHTMARE__H

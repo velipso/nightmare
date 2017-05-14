@@ -173,6 +173,9 @@ fi
 clang                                      \
 	-o "$TGT_DIR/nightmare"                \
 	$DEBUG_FLAG                            \
+	-DSINK_ALLOC=nms_alloc                 \
+	-DSINK_REALLOC=nms_realloc             \
+	-DSINK_FREE=nms_free                   \
 	-fwrapv                                \
 	-Werror                                \
 	-I"$SRC_DIR/demo/sdl-$SDL_VER/include" \

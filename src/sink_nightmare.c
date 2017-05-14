@@ -4,7 +4,12 @@
 
 #include "sink_nightmare.h"
 
-static sink_val L_patchname(sink_ctx ctx, int size, sink_val *args, nm_ctx nctx){
+typedef struct {
+	nm_ctx ctx;
+	uint16_t channel;
+} nm_user_st, *nm_user;
+
+static sink_val L_patchname(sink_ctx ctx, int size, sink_val *args, nm_user u){
 	double idx;
 	if (!sink_arg_num(ctx, size, args, 0, &idx))
 		return SINK_NIL;
@@ -14,7 +19,7 @@ static sink_val L_patchname(sink_ctx ctx, int size, sink_val *args, nm_ctx nctx)
 	return sink_str_newcstr(ctx, nm_patch_str(i));
 }
 
-static sink_val L_patchcat(sink_ctx ctx, int size, sink_val *args, nm_ctx nctx){
+static sink_val L_patchcat(sink_ctx ctx, int size, sink_val *args, nm_user u){
 	double idx;
 	if (!sink_arg_num(ctx, size, args, 0, &idx))
 		return SINK_NIL;
@@ -109,7 +114,7 @@ static inline parse_note_st parse_note(const uint8_t *data){
 	return ret;
 }
 
-static sink_val L_note(sink_ctx ctx, int size, sink_val *args, nm_ctx nctx){
+static sink_val L_note(sink_ctx ctx, int size, sink_val *args, nm_user u){
 	sink_val cn = SINK_NIL;
 	sink_val co;
 	if (size == 1){
@@ -182,7 +187,20 @@ static sink_val L_note(sink_ctx ctx, int size, sink_val *args, nm_ctx nctx){
 	return sink_abortcstr(ctx, "Invalid arguments to `music.note`");
 }
 
-static sink_val L_reset(sink_ctx ctx, int size, sink_val *args, nm_ctx nctx){
+static sink_val L_channel(sink_ctx ctx, int size, sink_val *args, nm_user u){
+	if (size >= 1){
+		double chan;
+		if (!sink_arg_num(ctx, size, args, 1, &chan))
+			return SINK_NIL;
+		uint16_t c = (uint16_t)chan;
+		if (c != chan || c >= u->ctx->channel_count)
+			return sink_abortformat(ctx, "Invalid channel (0 to %d)", u->ctx->channel_count - 1);
+		u->channel = c;
+	}
+	return sink_num(u->channel);
+}
+
+static sink_val L_reset(sink_ctx ctx, int size, sink_val *args, nm_user u){
 	double ticks;
 	if (!sink_arg_num(ctx, size, args, 0, &ticks))
 		return SINK_NIL;
@@ -193,17 +211,17 @@ static sink_val L_reset(sink_ctx ctx, int size, sink_val *args, nm_ctx nctx){
 	uint16_t t2 = (uint16_t)tpq;
 	if (t1 != ticks || t2 != tpq)
 		return sink_abortcstr(ctx, "Invalid numbers; expecting integers");
-	if (!nm_ev_reset(nctx, t1, t2))
+	if (!nm_ev_reset(u->ctx, t1, t2))
 		return sink_abortcstr(ctx, "Failed to insert event");
 	return sink_bool(true);
 }
 
-static sink_val L_noteon(sink_ctx ctx, int size, sink_val *args, nm_ctx nctx){
+static sink_val L_noteplay(sink_ctx ctx, int size, sink_val *args, nm_user u){
 	double ticks;
 	if (!sink_arg_num(ctx, size, args, 0, &ticks))
 		return SINK_NIL;
-	double chan;
-	if (!sink_arg_num(ctx, size, args, 1, &chan))
+	double duration;
+	if (!sink_arg_num(ctx, size, args, 1, &duration))
 		return SINK_NIL;
 	double note;
 	if (!sink_arg_num(ctx, size, args, 2, &note))
@@ -212,42 +230,19 @@ static sink_val L_noteon(sink_ctx ctx, int size, sink_val *args, nm_ctx nctx){
 	if (size >= 4 && !sink_arg_num(ctx, size, args, 3, &vel))
 		return SINK_NIL;
 	uint32_t t = (uint32_t)ticks;
-	uint16_t c = (uint16_t)chan;
+	uint32_t d = (uint32_t)duration;
 	uint8_t n = ((uint8_t)note) & 0x7F;
-	if (t != ticks || c != chan || n != note)
+	if (t != ticks || d != duration || n != note)
 		return sink_abortcstr(ctx, "Invalid numbers; expecting integers");
 	if (vel <= 0 || vel > 1)
 		return sink_abortcstr(ctx, "Invalid velocity, must be between (0, 1]");
-	if (c >= nctx->channel_count)
-		return sink_abortformat(ctx, "Invalid channel (must be 0 to %d)", nctx->channel_count - 1);
-	if (!nm_ev_noteon(nctx, t, c, n, vel))
+	if (!nm_ev_noteon(u->ctx, t, u->channel, n, vel) ||
+		!nm_ev_noteoff(u->ctx, t + d, u->channel, n))
 		return sink_abortcstr(ctx, "Failed to insert event");
 	return sink_bool(true);
 }
 
-static sink_val L_noteoff(sink_ctx ctx, int size, sink_val *args, nm_ctx nctx){
-	double ticks;
-	if (!sink_arg_num(ctx, size, args, 0, &ticks))
-		return SINK_NIL;
-	double chan;
-	if (!sink_arg_num(ctx, size, args, 1, &chan))
-		return SINK_NIL;
-	double note;
-	if (!sink_arg_num(ctx, size, args, 2, &note))
-		return SINK_NIL;
-	uint32_t t = (uint32_t)ticks;
-	uint16_t c = (uint16_t)chan;
-	uint8_t n = ((uint8_t)note) & 0x7F;
-	if (t != ticks || c != chan || n != note)
-		return sink_abortcstr(ctx, "Invalid numbers; expecting integers");
-	if (c >= nctx->channel_count)
-		return sink_abortformat(ctx, "Invalid channel (must be 0 to %d)", nctx->channel_count - 1);
-	if (!nm_ev_noteoff(nctx, t, c, n))
-		return sink_abortcstr(ctx, "Failed to insert event");
-	return sink_bool(true);
-}
-
-static sink_val L_tempo(sink_ctx ctx, int size, sink_val *args, nm_ctx nctx){
+static sink_val L_tempo(sink_ctx ctx, int size, sink_val *args, nm_user u){
 	double ticks;
 	if (!sink_arg_num(ctx, size, args, 0, &ticks))
 		return SINK_NIL;
@@ -255,30 +250,26 @@ static sink_val L_tempo(sink_ctx ctx, int size, sink_val *args, nm_ctx nctx){
 	if (!sink_arg_num(ctx, size, args, 1, &upq))
 		return SINK_NIL;
 	uint32_t t = (uint32_t)ticks;
-	uint32_t u = (uint32_t)upq;
-	if (t != ticks || u != upq)
+	uint32_t u2 = (uint32_t)upq;
+	if (t != ticks || u2 != upq)
 		return sink_abortcstr(ctx, "Invalid numbers; expecting integers");
-	if (!nm_ev_tempo(nctx, t, u))
+	if (!nm_ev_tempo(u->ctx, t, u2))
 		return sink_abortcstr(ctx, "Failed to insert event");
 	return sink_bool(true);
 }
 
-static sink_val L_patch(sink_ctx ctx, int size, sink_val *args, nm_ctx nctx){
+static sink_val L_patch(sink_ctx ctx, int size, sink_val *args, nm_user u){
 	double ticks;
 	if (!sink_arg_num(ctx, size, args, 0, &ticks))
 		return SINK_NIL;
-	double chan;
-	if (!sink_arg_num(ctx, size, args, 1, &chan))
-		return SINK_NIL;
 	double patch;
-	if (!sink_arg_num(ctx, size, args, 2, &patch))
+	if (!sink_arg_num(ctx, size, args, 1, &patch))
 		return SINK_NIL;
 	uint32_t t = (uint32_t)ticks;
-	uint16_t c = (uint16_t)chan;
 	uint8_t p = (uint8_t)patch;
-	if (t != ticks || c != chan || p != patch)
+	if (t != ticks || p != patch)
 		return sink_abortcstr(ctx, "Invalid numbers; expecting integers");
-	if (!nm_ev_patch(nctx, t, c, p))
+	if (!nm_ev_patch(u->ctx, t, u->channel, p))
 		return sink_abortcstr(ctx, "Failed to insert event");
 	return sink_bool(true);
 }
@@ -317,22 +308,29 @@ void sink_nightmare_scr(sink_scr scr){
 		"declare patchname 'nightmare.patchname';"
 		"declare patchcat  'nightmare.patchcat' ;"
 		"declare note      'nightmare.note'     ;"
+		"declare channel   'nightmare.channel'  ;"
 		"declare reset     'nightmare.reset'    ;"
-		"declare noteon    'nightmare.noteon'   ;"
-		"declare noteoff   'nightmare.noteoff'  ;"
+		"declare noteplay  'nightmare.noteplay' ;"
 		"declare tempo     'nightmare.tempo'    ;"
 		"declare patch     'nightmare.patch'    ;"
 		"end"
 	);
 }
 
-void sink_nightmare_ctx(sink_ctx ctx, nm_ctx nctx){
-	sink_ctx_native(ctx, "nightmare.patchname", nctx, (sink_native_func)L_patchname);
-	sink_ctx_native(ctx, "nightmare.patchcat" , nctx, (sink_native_func)L_patchcat );
-	sink_ctx_native(ctx, "nightmare.note"     , nctx, (sink_native_func)L_note     );
-	sink_ctx_native(ctx, "nightmare.reset"    , nctx, (sink_native_func)L_reset    );
-	sink_ctx_native(ctx, "nightmare.noteon"   , nctx, (sink_native_func)L_noteon   );
-	sink_ctx_native(ctx, "nightmare.noteoff"  , nctx, (sink_native_func)L_noteoff  );
-	sink_ctx_native(ctx, "nightmare.tempo"    , nctx, (sink_native_func)L_tempo    );
-	sink_ctx_native(ctx, "nightmare.patch"    , nctx, (sink_native_func)L_patch    );
+bool sink_nightmare_ctx(sink_ctx ctx, nm_ctx nctx){
+	nm_user u = nm_alloc(sizeof(nm_user_st));
+	if (u == NULL)
+		return false;
+	sink_ctx_cleanup(ctx, u, nm_free);
+	u->ctx = nctx;
+	u->channel = 0;
+	sink_ctx_native(ctx, "nightmare.patchname", u, (sink_native_func)L_patchname);
+	sink_ctx_native(ctx, "nightmare.patchcat" , u, (sink_native_func)L_patchcat );
+	sink_ctx_native(ctx, "nightmare.note"     , u, (sink_native_func)L_note     );
+	sink_ctx_native(ctx, "nightmare.channel"  , u, (sink_native_func)L_channel  );
+	sink_ctx_native(ctx, "nightmare.reset"    , u, (sink_native_func)L_reset    );
+	sink_ctx_native(ctx, "nightmare.noteplay" , u, (sink_native_func)L_noteplay );
+	sink_ctx_native(ctx, "nightmare.tempo"    , u, (sink_native_func)L_tempo    );
+	sink_ctx_native(ctx, "nightmare.patch"    , u, (sink_native_func)L_patch    );
+	return true;
 }

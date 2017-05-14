@@ -14,13 +14,11 @@ for var m: range 10
 	var ch = rand.pick chords
 	var nb = (note 'C1') + base % 12
 	var len = 25 * (2 + rand.int % 2)
-	noteon t, 0, nb
-	noteoff t + len, 0, nb
+	noteplay t, len, nb
 	for var offset: ch
 		var n = base + offset
 		var mix = rand.int % 10
-		noteon t + mix, 0, n
-		noteoff t + mix + len, 0, n
+		noteplay t + mix, len, n
 	end
 	t += len
 end

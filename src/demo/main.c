@@ -273,6 +273,11 @@ void sdl_copy_audio(void *userdata, Uint8* stream, int len){
 	SDL_SemPost(lock_write);
 }
 
+// used by sink for memory management
+void *nms_alloc(size_t sz){ return nm_alloc(sz); }
+void *nms_realloc(void *pt, size_t sz){ return nm_realloc(pt, sz); }
+void nms_free(void *pt){ nm_free(pt); }
+
 int main(int argc, char **argv){
 	// z/Zelda3ocarina.mid              // very small and simple
 	// f/For_Those_About_To_Rock.MID    // 0-size MTrk
@@ -349,7 +354,11 @@ int main(int argc, char **argv){
 		}
 
 		sink_ctx sctx = sink_ctx_new(scr, sink_stdio);
-		sink_nightmare_ctx(sctx, nctx);
+		if (!sink_nightmare_ctx(sctx, nctx)){
+			fprintf(stderr, "Out of memory\n");
+			sink_scr_free(scr);
+			goto cleanup;
+		}
 
 		sink_run res = sink_ctx_run(sctx);
 		if (res == SINK_RUN_FAIL){
