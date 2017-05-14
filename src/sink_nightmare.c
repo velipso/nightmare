@@ -182,8 +182,105 @@ static sink_val L_note(sink_ctx ctx, int size, sink_val *args, nm_ctx nctx){
 	return sink_abortcstr(ctx, "Invalid arguments to `music.note`");
 }
 
+static sink_val L_reset(sink_ctx ctx, int size, sink_val *args, nm_ctx nctx){
+	double ticks;
+	if (!sink_arg_num(ctx, size, args, 0, &ticks))
+		return SINK_NIL;
+	double tpq;
+	if (!sink_arg_num(ctx, size, args, 1, &tpq))
+		return SINK_NIL;
+	uint32_t t1 = (uint32_t)ticks;
+	uint16_t t2 = (uint16_t)tpq;
+	if (t1 != ticks || t2 != tpq)
+		return sink_abortcstr(ctx, "Invalid numbers; expecting integers");
+	if (!nm_ev_reset(nctx, t1, t2))
+		return sink_abortcstr(ctx, "Failed to insert event");
+	return sink_bool(true);
+}
+
 static sink_val L_noteon(sink_ctx ctx, int size, sink_val *args, nm_ctx nctx){
-	return SINK_NIL;
+	double ticks;
+	if (!sink_arg_num(ctx, size, args, 0, &ticks))
+		return SINK_NIL;
+	double chan;
+	if (!sink_arg_num(ctx, size, args, 1, &chan))
+		return SINK_NIL;
+	double note;
+	if (!sink_arg_num(ctx, size, args, 2, &note))
+		return SINK_NIL;
+	double vel = 1;
+	if (size >= 4 && !sink_arg_num(ctx, size, args, 3, &vel))
+		return SINK_NIL;
+	uint32_t t = (uint32_t)ticks;
+	uint16_t c = (uint16_t)chan;
+	uint8_t n = ((uint8_t)note) & 0x7F;
+	if (t != ticks || c != chan || n != note)
+		return sink_abortcstr(ctx, "Invalid numbers; expecting integers");
+	if (vel <= 0 || vel > 1)
+		return sink_abortcstr(ctx, "Invalid velocity, must be between (0, 1]");
+	if (c >= nctx->channel_count)
+		return sink_abortformat(ctx, "Invalid channel (must be 0 to %d)", nctx->channel_count - 1);
+	if (!nm_ev_noteon(nctx, t, c, n, vel))
+		return sink_abortcstr(ctx, "Failed to insert event");
+	return sink_bool(true);
+}
+
+static sink_val L_noteoff(sink_ctx ctx, int size, sink_val *args, nm_ctx nctx){
+	double ticks;
+	if (!sink_arg_num(ctx, size, args, 0, &ticks))
+		return SINK_NIL;
+	double chan;
+	if (!sink_arg_num(ctx, size, args, 1, &chan))
+		return SINK_NIL;
+	double note;
+	if (!sink_arg_num(ctx, size, args, 2, &note))
+		return SINK_NIL;
+	uint32_t t = (uint32_t)ticks;
+	uint16_t c = (uint16_t)chan;
+	uint8_t n = ((uint8_t)note) & 0x7F;
+	if (t != ticks || c != chan || n != note)
+		return sink_abortcstr(ctx, "Invalid numbers; expecting integers");
+	if (c >= nctx->channel_count)
+		return sink_abortformat(ctx, "Invalid channel (must be 0 to %d)", nctx->channel_count - 1);
+	if (!nm_ev_noteoff(nctx, t, c, n))
+		return sink_abortcstr(ctx, "Failed to insert event");
+	return sink_bool(true);
+}
+
+static sink_val L_tempo(sink_ctx ctx, int size, sink_val *args, nm_ctx nctx){
+	double ticks;
+	if (!sink_arg_num(ctx, size, args, 0, &ticks))
+		return SINK_NIL;
+	double upq;
+	if (!sink_arg_num(ctx, size, args, 1, &upq))
+		return SINK_NIL;
+	uint32_t t = (uint32_t)ticks;
+	uint32_t u = (uint32_t)upq;
+	if (t != ticks || u != upq)
+		return sink_abortcstr(ctx, "Invalid numbers; expecting integers");
+	if (!nm_ev_tempo(nctx, t, u))
+		return sink_abortcstr(ctx, "Failed to insert event");
+	return sink_bool(true);
+}
+
+static sink_val L_patch(sink_ctx ctx, int size, sink_val *args, nm_ctx nctx){
+	double ticks;
+	if (!sink_arg_num(ctx, size, args, 0, &ticks))
+		return SINK_NIL;
+	double chan;
+	if (!sink_arg_num(ctx, size, args, 1, &chan))
+		return SINK_NIL;
+	double patch;
+	if (!sink_arg_num(ctx, size, args, 2, &patch))
+		return SINK_NIL;
+	uint32_t t = (uint32_t)ticks;
+	uint16_t c = (uint16_t)chan;
+	uint8_t p = (uint8_t)patch;
+	if (t != ticks || c != chan || p != patch)
+		return sink_abortcstr(ctx, "Invalid numbers; expecting integers");
+	if (!nm_ev_patch(nctx, t, c, p))
+		return sink_abortcstr(ctx, "Failed to insert event");
+	return sink_bool(true);
 }
 
 void sink_nightmare_scr(sink_scr scr){
@@ -220,7 +317,11 @@ void sink_nightmare_scr(sink_scr scr){
 		"declare patchname 'nightmare.patchname';"
 		"declare patchcat  'nightmare.patchcat' ;"
 		"declare note      'nightmare.note'     ;"
+		"declare reset     'nightmare.reset'    ;"
 		"declare noteon    'nightmare.noteon'   ;"
+		"declare noteoff   'nightmare.noteoff'  ;"
+		"declare tempo     'nightmare.tempo'    ;"
+		"declare patch     'nightmare.patch'    ;"
 		"end"
 	);
 }
@@ -229,5 +330,9 @@ void sink_nightmare_ctx(sink_ctx ctx, nm_ctx nctx){
 	sink_ctx_native(ctx, "nightmare.patchname", nctx, (sink_native_func)L_patchname);
 	sink_ctx_native(ctx, "nightmare.patchcat" , nctx, (sink_native_func)L_patchcat );
 	sink_ctx_native(ctx, "nightmare.note"     , nctx, (sink_native_func)L_note     );
+	sink_ctx_native(ctx, "nightmare.reset"    , nctx, (sink_native_func)L_reset    );
 	sink_ctx_native(ctx, "nightmare.noteon"   , nctx, (sink_native_func)L_noteon   );
+	sink_ctx_native(ctx, "nightmare.noteoff"  , nctx, (sink_native_func)L_noteoff  );
+	sink_ctx_native(ctx, "nightmare.tempo"    , nctx, (sink_native_func)L_tempo    );
+	sink_ctx_native(ctx, "nightmare.patch"    , nctx, (sink_native_func)L_patch    );
 }

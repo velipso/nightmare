@@ -1,0 +1,42 @@
+
+include 'nightmare' # required
+using music
+
+say 'A simple piano diddy written in sink'
+
+/*
+# list all the instruments
+for var i: range _PATCH_END
+	say (str.pad i, -3), (str.pad (patchname i), 40), patchcat i
+end
+# */
+
+/*
+# list all the notes
+for var i: range 128
+	say (str.pad i, -3), note i
+end
+# */
+
+reset 0, 1
+tempo 0, 10000
+var t = 0
+var chords = {
+	{0, 4, 7}, # major chord
+	{0, 3, 7}  # minor chord
+}
+for var m: range 10
+	var base = (note 'C3') + rand.int % 24
+	var ch = rand.pick chords
+	var nb = (note 'C1') + base % 12
+	var len = 25 * (2 + rand.int % 2)
+	noteon t, 0, nb
+	noteoff t + len, 0, nb
+	for var offset: ch
+		var n = base + offset
+		var mix = rand.int % 10
+		noteon t + mix, 0, n
+		noteoff t + mix + len, 0, n
+	end
+	t += len
+end
