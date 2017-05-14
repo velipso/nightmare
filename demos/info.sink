@@ -1,0 +1,13 @@
+
+include 'nightmare' # required
+using music
+
+# list all the instruments
+for var i: range _PATCH_END
+	say (str.pad i, -3), (str.pad (patchname i), 40), patchcat i
+end
+
+# list all the notes
+for var i: range 128
+	say (str.pad i, -3), note i
+end
