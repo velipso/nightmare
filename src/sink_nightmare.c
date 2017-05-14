@@ -7,6 +7,7 @@
 typedef struct {
 	nm_ctx ctx;
 	uint16_t channel;
+	uint16_t tpq;
 } nm_user_st, *nm_user;
 
 static sink_val L_patchname(sink_ctx ctx, int size, sink_val *args, nm_user u){
@@ -204,14 +205,19 @@ static sink_val L_reset(sink_ctx ctx, int size, sink_val *args, nm_user u){
 	double ticks;
 	if (!sink_arg_num(ctx, size, args, 0, &ticks))
 		return SINK_NIL;
-	double tpq;
-	if (!sink_arg_num(ctx, size, args, 1, &tpq))
-		return SINK_NIL;
-	uint32_t t1 = (uint32_t)ticks;
-	uint16_t t2 = (uint16_t)tpq;
-	if (t1 != ticks || t2 != tpq)
-		return sink_abortcstr(ctx, "Invalid numbers; expecting integers");
-	if (!nm_ev_reset(u->ctx, t1, t2))
+	uint32_t t = (uint32_t)ticks;
+	if (t != ticks)
+		return sink_abortcstr(ctx, "Invalid ticks; expecting integers");
+	if (size > 1){
+		double tpq;
+		if (!sink_arg_num(ctx, size, args, 1, &tpq))
+			return SINK_NIL;
+		uint16_t t2 = (uint16_t)tpq;;
+		if (t2 != tpq)
+			return sink_abortcstr(ctx, "Invalid ticks per quarternote; expecting integer");
+		u->tpq = t2;
+	}
+	if (!nm_ev_reset(u->ctx, t, u->tpq))
 		return sink_abortcstr(ctx, "Failed to insert event");
 	return sink_bool(true);
 }
@@ -324,6 +330,7 @@ bool sink_nightmare_ctx(sink_ctx ctx, nm_ctx nctx){
 	sink_ctx_cleanup(ctx, u, nm_free);
 	u->ctx = nctx;
 	u->channel = 0;
+	u->tpq = nctx->ticks_per_quarternote;
 	sink_ctx_native(ctx, "nightmare.patchname", u, (sink_native_func)L_patchname);
 	sink_ctx_native(ctx, "nightmare.patchcat" , u, (sink_native_func)L_patchcat );
 	sink_ctx_native(ctx, "nightmare.note"     , u, (sink_native_func)L_note     );
