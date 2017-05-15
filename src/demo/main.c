@@ -352,11 +352,46 @@ static inline void printctxerr(sink_ctx ctx){
 	fprintf(stderr, "%s\n", err ? err : "Error: Unknown");
 }
 
+static sink_val L_help(sink_ctx ctx, int size, sink_val *args, void *user){
+	sink_val help = sink_str_newcstr(ctx,
+		"Help: Nightmare Sink API\n"
+		"  bake tick          # send the events within `tick` to the engine\n"
+		"  bakeall            # send all pending events to the engine\n"
+		"  channel            # select a channel for future commands\n"
+		"  defpatch p, wave, peak, attack, decay, sustain, harmonic1, h2, h3, h4\n"
+		"                     # overwrite the default patch parameters for patch p\n"
+		"  note 'C4'          # convert a string to a note number\n"
+		"  note C4            # convert a note number to a list\n"
+		"  note {'C', 4}      # convert a list {note, octave} to a note number\n"
+		"  noteplay tick, dur, note[, vel]\n"
+		"                     # insert a note to play for duration\n"
+		"  patch p            # switch patch for the current channel to p (number)\n"
+		"  patchcat p         # get patch p's (number) category name\n"
+		"  patchname p        # get patch p's (number) descriptive name\n"
+		"  reset tick[, tpq]  # insert reset event with ticks per quarternote\n"
+		"  tempo tick, usecpq # insert tempo event with microseconds per quarternote\n"
+		"\nExample:\n"
+		"> reset      0,  50     # 50 ticks per quarternote\n"
+		"> tempo      0, 100000  # 100,000 microseconds per quarternote\n"
+		"> noteplay   0, 100, C4 # play C4 starting at tick 0 for 100 ticks\n"
+		"> noteplay 100, 100, D4 # play D4 starting at tick 100 for 100 ticks\n"
+		"> noteplay 200, 100, E4 # play E4 starting at tick 200 for 100 ticks\n"
+		"> bakeall               # send all pending events to the engine\n"
+		"... the notes play ..."
+	);
+	sink_say(ctx, 1, &help);
+	return SINK_NIL;
+}
+
 static inline int repl(nm_ctx nctx){
 	int res = 0;
 	sink_scr scr = getscr(SINK_SCR_REPL);
 	sink_ctx ctx = getctx(scr, nctx);
-	sink_scr_write(scr, 32, (const uint8_t *)"include 'nightmare';using music;");
+	sink_scr_write(scr, 66, (const uint8_t *)
+		"include 'nightmare';"
+		"using music;"
+		"declare help 'nightmaremain.help';");
+	sink_ctx_native(ctx, "nightmaremain.help", NULL, L_help);
 	int line = 1;
 	int bufsize = 0;
 	int bufcount = 200;
