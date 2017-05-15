@@ -1269,6 +1269,7 @@ bool nm_ctx_bake(nm_ctx ctx, uint32_t ticks){
 		if (wev == ctx->ins_wevent)
 			found_ins = true;
 		ctx->events[ctx->ev_write] = wev->ev;
+		ctx->events[ctx->ev_write].tick += ctx->ticks;
 		nm_wevent del = wev;
 		wev = wev->next;
 		nm_free(del);

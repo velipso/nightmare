@@ -20,6 +20,19 @@
 #	include <unistd.h> // getcwd
 #endif
 
+static volatile bool done = false;
+#include <signal.h>
+
+static void catchdone(int dummy){
+	fclose(stdin);
+	done = true;
+}
+
+static inline void catchint(){
+	signal(SIGINT, catchdone);
+	signal(SIGSTOP, catchdone);
+}
+
 const int sample_buffer_size = 1024;
 
 static bool fs_isdir(const char *dir){
@@ -94,8 +107,8 @@ static sink_inc_st inc = {
 	.user = NULL
 };
 
-void process_midi(const char *file);
-void each_midi(const char *file){
+static void process_midi(const char *file);
+static void each_midi(const char *file){
 	if (fs_isdir(file)){
 		fs_readdir(file, each_midi);
 		return;
@@ -108,14 +121,14 @@ void each_midi(const char *file){
 }
 
 bool did_warn;
-void midi_warn(const char *msg, void *user){
+static void midi_warn(const char *msg, void *user){
 	did_warn = true;
 	printf("> %s\n", msg);
 }
 
 int tot_warn = 0;
 int tot_all = 0;
-void process_midi(const char *file){
+static void process_midi(const char *file){
 	did_warn = false;
 	printf("%s\n", &file[32]);
 	// TODO: anything?
@@ -133,7 +146,7 @@ typedef struct m_debug_memlist_struct {
 } m_debug_memlist_st, *m_debug_memlist;
 static m_debug_memlist mem_list = NULL;
 
-void *db_alloc(size_t size){
+static void *db_alloc(size_t size){
 	printf("alloc\n");
 	void *p = malloc(size);
 	m_debug_memlist m = malloc(sizeof(m_debug_memlist_st));
@@ -145,7 +158,7 @@ void *db_alloc(size_t size){
 	return p;
 }
 
-void *db_realloc(void *p, size_t size){
+static void *db_realloc(void *p, size_t size){
 	printf("realloc\n");
 	void *new_p;
 	if (p == NULL){
@@ -175,7 +188,7 @@ void *db_realloc(void *p, size_t size){
 	return new_p;
 }
 
-void db_free(void *p){
+static void db_free(void *p){
 	printf("free\n");
 	if (p == NULL)
 		return;
@@ -198,7 +211,7 @@ void db_free(void *p){
 		fprintf(stderr, "Freeing a pointer that wasn't originally allocated\n");
 }
 
-void db_flush(){
+static void db_flush(){
 	SDL_SemWait(mem_lock);
 	m_debug_memlist m = mem_list;
 	int count = 0;
@@ -216,27 +229,43 @@ void db_flush(){
 }
 #endif
 
-SDL_sem *lock_write;
-SDL_sem *lock_read;
-nm_sample_st sample_buffer[sample_buffer_size];
-bool render_done = false;
+static SDL_sem *lock_write;
+static SDL_sem *lock_read;
+static SDL_sem *lock_nm;
+static nm_sample_st sample_buffer[sample_buffer_size];
+static bool render_done = false;
+static int run_mode = 0; // 0 = repl, 1 = midi file, 2 = sink file
 
-int sdl_render_audio(void *data){
+static bool hassound(nm_ctx ctx){
+	SDL_SemWait(lock_nm);
+	bool ret = nm_ctx_eventsleft(ctx) > 0 || nm_ctx_voicesleft(ctx) > 0;
+	SDL_SemPost(lock_nm);
+	return ret;
+}
+
+static int sdl_render_audio(void *data){
 	nm_ctx ctx = (nm_ctx)data;
-	while (nm_ctx_eventsleft(ctx) > 0 || nm_ctx_voicesleft(ctx) > 0){
+	while (true){
+		bool hs = hassound(ctx);
+		if (run_mode != 0 && !hs)
+			break;
 		SDL_SemWait(lock_write);
 		memset(sample_buffer, 0, sizeof(nm_sample_st) * sample_buffer_size);
-		nm_ctx_process(ctx, sample_buffer_size, sample_buffer);
-		for (int i = 0; i < 128; i++){
-			int cnt = ctx->notecnt[i];
-			if      (cnt == 0) printf(" ");
-			else if (cnt == 1) printf(".");
-			else if (cnt == 2) printf(":");
-			else if (cnt == 3) printf("&");
-			else if (cnt == 4) printf("#");
-			else               printf("@");
+		if (hs){
+			SDL_SemWait(lock_nm);
+			nm_ctx_process(ctx, sample_buffer_size, sample_buffer);
+			SDL_SemPost(lock_nm);
+			for (int i = 0; i < 128; i++){
+				int cnt = ctx->notecnt[i];
+				if      (cnt == 0) printf(" ");
+				else if (cnt == 1) printf(".");
+				else if (cnt == 2) printf(":");
+				else if (cnt == 3) printf("&");
+				else if (cnt == 4) printf("#");
+				else               printf("@");
+			}
+			printf("%2X\n", nm_ctx_voicesleft(ctx));
 		}
-		printf("%2X\n", nm_ctx_voicesleft(ctx));
 		#ifndef NDEBUG
 		// crappy click detection
 		#if 0
@@ -263,7 +292,7 @@ int sdl_render_audio(void *data){
 	return 0;
 }
 
-void sdl_copy_audio(void *userdata, Uint8* stream, int len){
+static void sdl_copy_audio(void *userdata, Uint8* stream, int len){
 	if (render_done){
 		memset(stream, 0, len);
 		return;
@@ -277,6 +306,126 @@ void sdl_copy_audio(void *userdata, Uint8* stream, int len){
 void *nms_alloc(size_t sz){ return nm_alloc(sz); }
 void *nms_realloc(void *pt, size_t sz){ return nm_realloc(pt, sz); }
 void nms_free(void *pt){ nm_free(pt); }
+
+static inline sink_scr getscr(sink_scr_type type){
+	char *cwd = getcwd(NULL, 0);
+	sink_scr scr = sink_scr_new(inc, cwd, type);
+	free(cwd);
+	sink_scr_addpath(scr, ".");
+	sink_nightmare_scr(scr);
+	return scr;
+}
+
+static inline sink_ctx getctx(sink_scr scr, nm_ctx nctx){
+	sink_ctx sctx = sink_ctx_new(scr, sink_stdio);
+	if (sctx == NULL)
+		return sctx;
+	if (!sink_nightmare_ctx(sctx, nctx)){
+		sink_ctx_free(sctx);
+		return NULL;
+	}
+	return sctx;
+}
+
+static inline void printline(int line, int level){
+	if (line < 10)
+		printf(" %d", line);
+	else
+		printf("%d", line);
+	if (level <= 0)
+		printf(": ");
+	else{
+		printf(".");
+		for (int i = 0; i < level; i++)
+			printf("..");
+		printf(" ");
+	}
+}
+
+static inline void printscrerr(sink_scr scr){
+	const char *err = sink_scr_err(scr);
+	fprintf(stderr, "%s\n", err ? err : "Error: Unknown");
+}
+
+static inline void printctxerr(sink_ctx ctx){
+	const char *err = sink_ctx_err(ctx);
+	fprintf(stderr, "%s\n", err ? err : "Error: Unknown");
+}
+
+static inline int repl(nm_ctx nctx){
+	int res = 0;
+	sink_scr scr = getscr(SINK_SCR_REPL);
+	sink_ctx ctx = getctx(scr, nctx);
+	sink_scr_write(scr, 32, (const uint8_t *)"include 'nightmare';using music;");
+	int line = 1;
+	int bufsize = 0;
+	int bufcount = 200;
+	char *buf = malloc(sizeof(char) * bufcount);
+	if (buf == NULL){
+		sink_ctx_free(ctx);
+		sink_scr_free(scr);
+		fprintf(stderr, "Out of memory!\n");
+		return 1;
+	}
+	catchint();
+	printline(line, sink_scr_level(scr));
+	while (!done){
+		int ch = fgetc(stdin);
+		if (ch == EOF){
+			ch = '\n';
+			done = true;
+		}
+		if (bufsize >= bufcount - 1){ // make sure there is always room for two chars
+			bufcount += 200;
+			buf = realloc(buf, sizeof(char) * bufcount);
+			if (buf == NULL){
+				sink_ctx_free(ctx);
+				sink_scr_free(scr);
+				fprintf(stderr, "Out of memory!\n");
+				return 1;
+			}
+		}
+		buf[bufsize++] = ch;
+		if (ch == '\n'){
+			if (!sink_scr_write(scr, bufsize, (uint8_t *)buf))
+				printscrerr(scr);
+			if (sink_scr_level(scr) <= 0){
+				SDL_SemWait(lock_nm);
+				switch (sink_ctx_run(ctx)){
+					case SINK_RUN_PASS:
+						done = true;
+						res = 0;
+						break;
+					case SINK_RUN_FAIL:
+						printctxerr(ctx);
+						break;
+					case SINK_RUN_ASYNC:
+						fprintf(stderr, "TODO: REPL invoked async function\n");
+						done = true;
+						break;
+					case SINK_RUN_TIMEOUT:
+						fprintf(stderr, "REPL returned timeout (impossible)\n");
+						done = true;
+						break;
+					case SINK_RUN_REPLMORE:
+						// do nothing
+						break;
+				}
+				SDL_SemPost(lock_nm);
+			}
+			if (!done){
+				while (hassound(nctx))
+					SDL_Delay(50);
+				printline(++line, sink_scr_level(scr));
+			}
+			bufsize = 0;
+		}
+	}
+	free(buf);
+	sink_ctx_free(ctx);
+	sink_scr_free(scr);
+	return res;
+}
 
 int main(int argc, char **argv){
 	// z/Zelda3ocarina.mid              // very small and simple
@@ -305,26 +454,24 @@ int main(int argc, char **argv){
 	nm_free = db_free;
 	#endif
 
-	if (argc < 2){
-		printf(
-			"Usage:\n"
-			"  nightmare file.mid        Play a MIDI file\n"
-			"  nightmare file.sink       Execute a sink script\n");
-		res = 0;
-		goto cleanup;
+	if (argc >= 2){
+		// read start of file to see if it's a MIDI file
+		fp = fopen(argv[1], "rb");
+		if (fp == NULL){
+			fprintf(stderr, "Failed to read file: %s\n", argv[1]);
+			printf(
+				"Usage:\n"
+				"  nightmare                 Sink REPL\n"
+				"  nightmare file.mid        Play a MIDI file\n"
+				"  nightmare file.sink       Execute a sink script\n");
+			goto cleanup;
+		}
+		uint8_t filedata[8] = {0};
+		fread(filedata, 1, 8, fp);
+		fclose(fp);
+		fp = NULL;
+		run_mode = nm_ismidi(filedata) ? 1 : 2;
 	}
-
-	// read start of file to see if it's a MIDI file
-	fp = fopen(argv[1], "rb");
-	if (fp == NULL){
-		fprintf(stderr, "Failed to read file: %s\n", argv[1]);
-		goto cleanup;
-	}
-	uint8_t filedata[8] = {0};
-	fread(filedata, 1, 8, fp);
-	fclose(fp);
-	fp = NULL;
-	bool is_midi = nm_ismidi(filedata);
 
 	// create a nightmare context
 	nctx = nm_ctx_new(480, 1024, 32, 48000, NULL, 0, 0, NULL, NULL);
@@ -333,28 +480,27 @@ int main(int argc, char **argv){
 		goto cleanup;
 	}
 
-	if (is_midi){
+	if (run_mode == 1){
 		if (!nm_midi_newfile(nctx, argv[1], midi_warn, NULL)){
 			fprintf(stderr, "Failed to process midi file: %s\n", argv[1]);
 			goto cleanup;
 		}
 	}
-	else{
-		char *cwd = getcwd(NULL, 0);
-		sink_scr scr = sink_scr_new(inc, cwd, SINK_SCR_FILE);
-		free(cwd);
-		sink_scr_addpath(scr, ".");
-		sink_nightmare_scr(scr);
+	else if (run_mode == 2){
+		sink_scr scr = getscr(SINK_SCR_FILE);
+		if (scr == NULL){
+			fprintf(stderr, "Out of memory\n");
+			goto cleanup;
+		}
 
 		if (!sink_scr_loadfile(scr, argv[1])){
-			const char *err = sink_scr_err(scr);
-			fprintf(stderr, "%s\n", err ? err : "Error: Unknown");
+			printscrerr(scr);
 			sink_scr_free(scr);
 			goto cleanup;
 		}
 
-		sink_ctx sctx = sink_ctx_new(scr, sink_stdio);
-		if (!sink_nightmare_ctx(sctx, nctx)){
+		sink_ctx sctx = getctx(scr, nctx);
+		if (sctx == NULL){
 			fprintf(stderr, "Out of memory\n");
 			sink_scr_free(scr);
 			goto cleanup;
@@ -362,8 +508,7 @@ int main(int argc, char **argv){
 
 		sink_run res = sink_ctx_run(sctx);
 		if (res == SINK_RUN_FAIL){
-			const char *err = sink_ctx_err(sctx);
-			fprintf(stderr, "%s\n", err ? err : "Error: Unknown");
+			printctxerr(sctx);
 			sink_ctx_free(sctx);
 			sink_scr_free(scr);
 			goto cleanup;
@@ -405,12 +550,22 @@ int main(int argc, char **argv){
 			if (lock_read == NULL)
 				fprintf(stderr, "Failed to create semaphore: %s\n", SDL_GetError());
 			else{
-				SDL_Thread *thr = SDL_CreateThread(sdl_render_audio, "Nightmare Audio", nctx);
-				if (thr == NULL)
-					fprintf(stderr, "Failed to create thread: %s\n", SDL_GetError());
+				lock_nm = SDL_CreateSemaphore(1);
+				if (lock_nm == NULL)
+					fprintf(stderr, "Failed to create semaphore: %s\n", SDL_GetError());
 				else{
-					SDL_PauseAudioDevice(dev, 0); // begin playing
-					SDL_WaitThread(thr, NULL);
+					SDL_Thread *thr = SDL_CreateThread(sdl_render_audio, "Nightmare Audio", nctx);
+					if (thr == NULL)
+						fprintf(stderr, "Failed to create thread: %s\n", SDL_GetError());
+					else{
+						SDL_PauseAudioDevice(dev, 0); // begin playing
+						if (run_mode == 0){
+							res = repl(nctx);
+							run_mode = 1;
+						}
+						SDL_WaitThread(thr, NULL);
+					}
+					SDL_DestroySemaphore(lock_nm);
 				}
 				SDL_DestroySemaphore(lock_read);
 			}
