@@ -1,0 +1,28 @@
+
+include 'nightmare' # required
+using music
+
+reset 0, 50
+tempo 0, 100000
+for var wave: range 4
+	for var peak: range 0, 1, 0.1
+		for var attack: range 0, 2, 0.2
+			for var decay: range 0, 2, 0.2
+				for var sustain: range 0, 1, 0.1
+					for var h1: range 0, 1, 0.1
+						for var h2: range 0, 1, 0.1
+							for var h3: range 0, 1, 0.1
+								for var h4: range 0, 1, 0.1
+say wave, peak, attack, decay, sustain, h1, h2, h3, h4
+defpatch 0, wave, peak, attack, decay, sustain, h1, h2, h3, h4
+noteplay 0, 100, C4
+bakeall
+								end
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+end

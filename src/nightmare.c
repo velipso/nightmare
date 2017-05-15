@@ -1292,6 +1292,14 @@ bool nm_ctx_bakeall(nm_ctx ctx){
 	return nm_ctx_bake(ctx, ctx->last_wevent->ev.tick);
 }
 
+void nm_ctx_savemidi(nm_ctx ctx, nm_fwrite_func f_fwrite, void *user){
+	const int division = 480;
+	const uint8_t header[] = { 'M', 'T', 'h', 'd', 0, 0, 0, 6, 0, 0, 0, 1,
+		division >> 8, division & 0xFF };
+	f_fwrite(header, 1, sizeof(header), user);
+	// TODO: this
+}
+
 void nm_ctx_clear(nm_ctx ctx){
 	nm_wevent wev = ctx->wevents;
 	while (wev){

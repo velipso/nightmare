@@ -12,6 +12,7 @@
 #include <string.h>
 #include <dirent.h>
 #include <sys/stat.h>
+#include <locale.h>
 
 #ifdef SINK_WIN32 // TODO: test on win32
 #	include <direct.h> // _getcwd
@@ -255,14 +256,19 @@ static int sdl_render_audio(void *data){
 			SDL_SemWait(lock_nm);
 			nm_ctx_process(ctx, sample_buffer_size, sample_buffer);
 			SDL_SemPost(lock_nm);
-			for (int i = 0; i < 128; i++){
-				int cnt = ctx->notecnt[i];
-				if      (cnt == 0) printf(" ");
-				else if (cnt == 1) printf(".");
-				else if (cnt == 2) printf(":");
-				else if (cnt == 3) printf("&");
-				else if (cnt == 4) printf("#");
-				else               printf("@");
+			for (int i = 0; i < 128; i += 2){
+				bool left = ctx->notecnt[i] > 0;
+				bool right = ctx->notecnt[i + 1] > 0;
+				if (left){
+					if (right)
+						printf("%ls", L"\x2588");
+					else
+						printf("%ls", L"\x258c");
+				}
+				else if (right)
+					printf("%ls", L"\x2590");
+				else
+					printf(" ");
 			}
 			printf("%2X\n", nm_ctx_voicesleft(ctx));
 		}
@@ -369,6 +375,7 @@ static sink_val L_help(sink_ctx ctx, int size, sink_val *args, void *user){
 		"  patchcat p         # get patch p's (number) category name\n"
 		"  patchname p        # get patch p's (number) descriptive name\n"
 		"  reset tick[, tpq]  # insert reset event with ticks per quarternote\n"
+		"  savemidi 'file'    # save the pending events to a MIDI file\n"
 		"  tempo tick, usecpq # insert tempo event with microseconds per quarternote\n"
 		"\nExample:\n"
 		"> reset      0,  50     # 50 ticks per quarternote\n"
@@ -463,6 +470,7 @@ static inline int repl(nm_ctx nctx){
 }
 
 int main(int argc, char **argv){
+	setlocale(LC_ALL, "");
 	// z/Zelda3ocarina.mid              // very small and simple
 	// f/For_Those_About_To_Rock.MID    // 0-size MTrk
 	// TODO:

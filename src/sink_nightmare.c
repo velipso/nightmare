@@ -321,6 +321,10 @@ static sink_val L_bakeall(sink_ctx ctx, int size, sink_val *args, nm_user u){
 	return sink_bool(true);
 }
 
+static sink_val L_savemidi(sink_ctx ctx, int size, sink_val *args, nm_user u){
+	return SINK_NIL;
+}
+
 void sink_nightmare_scr(sink_scr scr){
 	sink_scr_inc(scr, "nightmare",
 		"namespace music;"
@@ -386,5 +390,6 @@ bool sink_nightmare_ctx(sink_ctx ctx, nm_ctx nctx){
 	sink_ctx_native(ctx, "nightmare.defpatch" , u, (sink_native_func)L_defpatch );
 	sink_ctx_native(ctx, "nightmare.bake"     , u, (sink_native_func)L_bake     );
 	sink_ctx_native(ctx, "nightmare.bakeall"  , u, (sink_native_func)L_bakeall  );
+	sink_ctx_native(ctx, "nightmare.savemidi" , u, (sink_native_func)L_savemidi );
 	return true;
 }

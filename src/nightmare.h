@@ -51,6 +51,8 @@ typedef struct nm_ctx_struct nm_ctx_st, *nm_ctx;
 typedef void (*nm_warn_func)(const char *warning, void *user);
 typedef bool (*nm_synth_patch_setup_func)(nm_ctx ctx, void *synth, nm_patch patch, void *patchinf);
 typedef bool (*nm_synth_render_func)(nm_ctx ctx, nm_voice voice, int len, nm_sample samples);
+typedef size_t (*nm_fwrite_func)(const void *restrict src, size_t size, size_t nitems,
+	void *restrict user);
 
 //
 // API
@@ -80,6 +82,7 @@ void        nm_defpatch(nm_patch patch, uint8_t wave, float peak, float attack, 
 	float sustain, float harmonic1, float harmonic2, float harmonic3, float harmonic4);
 bool        nm_ctx_bake(nm_ctx ctx, uint32_t ticks);
 bool        nm_ctx_bakeall(nm_ctx ctx);
+void        nm_ctx_savemidi(nm_ctx ctx, nm_fwrite_func f_fwrite, void *user);
 void        nm_ctx_clear(nm_ctx ctx);
 void        nm_ctx_process(nm_ctx ctx, int sample_len, nm_sample samples);
 void        nm_ctx_dumpev(nm_ctx ctx);
