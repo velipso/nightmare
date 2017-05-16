@@ -2,8 +2,8 @@
 include 'nightmare' # required
 using music
 
-reset 0, 1
-tempo 0, 10000
+reset 0, 50
+tempo 0, 4, 4, 120
 var t = 0
 var chords = {
 	{0, 4, 7}, # major chord

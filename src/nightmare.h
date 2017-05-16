@@ -76,7 +76,7 @@ bool        nm_ev_notemod(nm_ctx ctx, uint32_t tick, uint16_t channel, uint8_t n
 bool        nm_ev_noteoff(nm_ctx ctx, uint32_t tick, uint16_t channel, uint8_t note);
 bool        nm_ev_chanmod(nm_ctx ctx, uint32_t tick, uint16_t channel, float mod);
 bool        nm_ev_chanbend(nm_ctx ctx, uint32_t tick, uint16_t channel, float bend);
-bool        nm_ev_tempo(nm_ctx ctx, uint32_t tick, uint32_t usec_per_quarternote);
+bool        nm_ev_tempo(nm_ctx ctx, uint32_t tick, uint8_t num, uint8_t den, float tempo);
 bool        nm_ev_patch(nm_ctx ctx, uint32_t tick, uint16_t channel, nm_patch patch);
 void        nm_defpatch(nm_patch patch, uint8_t wave, float peak, float attack, float decay,
 	float sustain, float harmonic1, float harmonic2, float harmonic3, float harmonic4);
@@ -478,16 +478,18 @@ struct nm_ctx_struct {
 	int ev_size;
 	int ev_read;
 	int ev_write;
+	float tempo;
+	uint8_t ts_num;
+	uint8_t ts_den;
 	uint16_t ticks_per_quarternote;
 	int samples_per_sec;
-	uint32_t usec_per_quarternote;
 	double ticks;
 	double samples_per_tick;
 	nm_voice voices_free;
 	nm_voice voices_used;
 	nm_channel channels;
 	uint16_t channel_count;
-	uint8_t patchinf_status[NM__PATCH_END]; // 0 = unallocated/default, 1 = custom synth
+	uint8_t patchinf_custom[NM__PATCH_END]; // 0 = unallocated/default, 1 = custom synth
 	void *patchinf[NM__PATCH_END];
 	int notecnt[128];
 };

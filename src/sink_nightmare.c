@@ -252,14 +252,24 @@ static sink_val L_tempo(sink_ctx ctx, int size, sink_val *args, nm_user u){
 	double ticks;
 	if (!sink_arg_num(ctx, size, args, 0, &ticks))
 		return SINK_NIL;
-	double upq;
-	if (!sink_arg_num(ctx, size, args, 1, &upq))
+	double num;
+	if (!sink_arg_num(ctx, size, args, 1, &num))
+		return SINK_NIL;
+	double den;
+	if (!sink_arg_num(ctx, size, args, 2, &den))
+		return SINK_NIL;
+	double tempo;
+	if (!sink_arg_num(ctx, size, args, 3, &tempo))
 		return SINK_NIL;
 	uint32_t t = (uint32_t)ticks;
-	uint32_t u2 = (uint32_t)upq;
-	if (t != ticks || u2 != upq)
-		return sink_abortcstr(ctx, "Invalid numbers; expecting integers");
-	if (!nm_ev_tempo(u->ctx, t, u2))
+	uint8_t n = ((uint8_t)num) & 0x7F;
+	uint8_t d = (uint8_t)den;
+	float tm = (float)tempo;
+	if (t != ticks || n != num || d != den || isnan(tempo) || tempo <= 0 || tempo > 1000)
+		return sink_abortcstr(ctx, "Invalid parameters, out of range");
+	if (d != 1 && d != 2 && d != 4 && d != 8 && d != 16 && d != 32 && d != 64 && d != 128)
+		return sink_abortcstr(ctx, "Invalid denominator, must be power of 2 between 1-128");
+	if (!nm_ev_tempo(u->ctx, t, n, d, tm))
 		return sink_abortcstr(ctx, "Failed to insert event");
 	return sink_bool(true);
 }

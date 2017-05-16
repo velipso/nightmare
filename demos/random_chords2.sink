@@ -8,7 +8,7 @@ def invert chord
 end
 
 reset 0, 12
-tempo 0, 400000
+tempo 0, 4, 4, 120
 var t = 0
 var majorkey = {0, 2, 4, 5, 7, 9, 11}
 var keyof = (note 'C3') + rand.int % 12

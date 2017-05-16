@@ -292,14 +292,25 @@ static struct {
 };
 
 static inline void recalc_spt(nm_ctx ctx){
-	ctx->samples_per_tick =
-		((double)ctx->samples_per_sec * (double)ctx->usec_per_quarternote) /
-		(1000000.0 * (double)ctx->ticks_per_quarternote);
+	// Variable:                     Units:
+	// ctx->samples_per_sec          samples/sec
+	// ctx->ts_den                   beats/(4*quarternote)
+	// ctx->tempo                    beats/min
+	// ctx->ticks_per_quarternote    ticks/quarternote
+	// 60                            sec/min
+	// ctx->samples_per_tick         samples/tick
+	// therefore:
+	// samples/tick = samples/sec * sec/min * min/beats * beats/quarternote * quarternote/tick
+	// which is:   (note: 60/4 is 15)
+	ctx->samples_per_tick = ((double)ctx->samples_per_sec * 15.0 * (double)ctx->ts_den) /
+		((double)ctx->tempo * (double)ctx->ticks_per_quarternote);
 }
 
 static inline void reset_tempo(nm_ctx ctx, uint16_t ticks_per_quarternote){
 	ctx->ticks_per_quarternote = ticks_per_quarternote;
-	ctx->usec_per_quarternote = 500000;
+	ctx->tempo = 120;
+	ctx->ts_num = 4;
+	ctx->ts_den = 4;
 	recalc_spt(ctx);
 }
 
@@ -357,7 +368,7 @@ nm_ctx nm_ctx_new(uint16_t ticks_per_quarternote, uint16_t channels, int voices,
 			goto cleanup;
 	}
 
-	memset(ctx->patchinf_status, 0, sizeof(uint8_t) * NM__PATCH_END);
+	memset(ctx->patchinf_custom, 0, sizeof(uint8_t) * NM__PATCH_END);
 
 	if (sizeof_patchinf < sizeof(nm_defpatchinf_st))
 		sizeof_patchinf = sizeof(nm_defpatchinf_st);
@@ -510,7 +521,6 @@ bool nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_
 	uint64_t pos = 0;
 	uint32_t ticks = 0;
 	bool found_header = false;
-	bool ignore_timesig;
 	int hd_format;
 	int hd_track_ch;
 	uint16_t hd_ticks_per_q;
@@ -518,6 +528,15 @@ bool nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_
 	int max_channels = 0;
 	int track_i = 0;
 	int running_status;
+	// timing info (ti) variables
+	// this is a bit complicated because nightmare stores tempo/timesig information in a single
+	// event but MIDI stores it as separate events, so we have to be a little clever to combine the
+	// events correctly
+	bool ti_dirty;
+	float ti_tempo;
+	uint8_t ti_tsnum;
+	uint8_t ti_tsden;
+	uint32_t ti_ticks;
 	chunk_st chk;
 	while (pos < size){
 		if (!read_chunk(pos, size, data, &chk)){
@@ -593,7 +612,10 @@ bool nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_
 				}
 				int chan_base = 0;
 				if (track_i == 0 || hd_format == 2){
-					ignore_timesig = false;
+					ti_dirty = false;
+					ti_tempo = 120;
+					ti_tsnum = 4;
+					ti_tsden = 4;
 					nm_ev_reset(ctx, ticks, hd_ticks_per_q);
 				}
 				if (hd_format == 1){
@@ -636,6 +658,12 @@ bool nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_
 
 					ticks += dt;
 
+					if (ti_dirty && ticks != ti_ticks){
+						if (!nm_ev_tempo(ctx, ti_ticks, ti_tsnum, ti_tsden, ti_tempo))
+							return false;
+						ti_dirty = false;
+					}
+
 					if (p >= p_end){
 						warn(f_warn, user, "Missing message in track %d", track_i);
 						goto mtrk_end;
@@ -676,7 +704,8 @@ bool nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_
 								"in track %d", vel, track_i);
 							vel ^= 0x80;
 						}
-						nm_ev_noteoff(ctx, ticks, chan_base + (msg & 0xF), note);
+						if (!nm_ev_noteoff(ctx, ticks, chan_base + (msg & 0xF), note))
+							return false;
 					}
 					else if (msg >= 0x90 && msg < 0xA0){ // Note On
 						if (p + 1 >= p_end){
@@ -697,11 +726,14 @@ bool nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_
 								"in track %d", vel, track_i);
 							vel ^= 0x80;
 						}
-						if (vel == 0)
-							nm_ev_noteoff(ctx, ticks, chan_base + (msg & 0xF), note);
+						if (vel == 0){
+							if (!nm_ev_noteoff(ctx, ticks, chan_base + (msg & 0xF), note))
+								return false;
+						}
 						else{
-							nm_ev_noteon(ctx, ticks, chan_base + (msg & 0xF), note,
-								vel == 0x40 ? 0.5f : (float)vel / 127.0f);
+							if (!nm_ev_noteon(ctx, ticks, chan_base + (msg & 0xF), note,
+								vel == 0x40 ? 0.5f : (float)vel / 127.0f))
+								return false;
 						}
 					}
 					else if (msg >= 0xA0 && msg < 0xB0){ // Note Pressure
@@ -723,8 +755,9 @@ bool nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_
 								"%02X) in track %d", pressure, track_i);
 							pressure ^= 0x80;
 						}
-						nm_ev_notemod(ctx, ticks, chan_base + (msg & 0xF), note,
-							pressure == 0x40 ? 0.5f : (float)pressure / 127.0f);
+						if (!nm_ev_notemod(ctx, ticks, chan_base + (msg & 0xF), note,
+							pressure == 0x40 ? 0.5f : (float)pressure / 127.0f))
+							return false;
 					}
 					else if (msg >= 0xB0 && msg < 0xC0){ // Control Change
 						if (p + 1 >= p_end){
@@ -775,8 +808,9 @@ bool nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_
 								"%02X) in track %d", pressure, track_i);
 							pressure ^= 0x80;
 						}
-						nm_ev_chanmod(ctx, ticks, chan_base + (msg & 0xF),
-							pressure == 0x40 ? 0.5f : (float)pressure / 127.0f);
+						if (!nm_ev_chanmod(ctx, ticks, chan_base + (msg & 0xF),
+							pressure == 0x40 ? 0.5f : (float)pressure / 127.0f))
+							return false;
 					}
 					else if (msg >= 0xE0 && msg < 0xF0){ // Pitch Bend
 						if (p + 1 >= p_end){
@@ -805,7 +839,8 @@ bool nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_
 							bendf = 0;
 						else
 							bendf = (float)(bend - 0x2000) / 8191.0f;
-						nm_ev_chanbend(ctx, ticks, chan_base + (msg & 0xF), bendf);
+						if (!nm_ev_chanbend(ctx, ticks, chan_base + (msg & 0xF), bendf))
+							return false;
 					}
 					else if (msg == 0xF0 || msg == 0xF7){ // SysEx Event
 						running_status = -1; // TODO: validate we should clear this
@@ -915,8 +950,19 @@ bool nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_
 											track_i);
 									}
 									else{
-										ignore_timesig = true;
-										nm_ev_tempo(ctx, ticks, tempo);
+										ti_dirty = true;
+										ti_ticks = ticks;
+										// Variable:     Unit:
+										// tempo         usec/quarternote
+										// ti_tsden      beats/(4*quarternote)
+										// 60            sec/min
+										// 1000000       usec/sec
+										// ti_tempo      beats/min
+										// therefore:
+										// beats/min = beats/quarternote * quarternote/usec *
+										//             usec/sec * sec/min
+										// which is:
+										ti_tempo = ((float)ti_tsden * 15000000.0f) / (float)tempo;
 									}
 								}
 								break;
@@ -927,16 +973,26 @@ bool nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_
 									warn(f_warn, user, "Missing data for Time Signature event "
 										"in track %d", track_i);
 								}
+								else if (data[p + 1] > 7){
+									warn(f_warn, user, "Time signature reports too large of a "
+										"denominator (2^%d) in track %d", data[p + 1], track_i);
+								}
 								else{
 									if (len > 4){
 										warn(f_warn, user, "Extra %d byte%s for Time Signature "
 											"event in track %d", len - 4, len - 4 == 1 ? "" : "s",
 											track_i);
 									}
-									if (!ignore_timesig){
-										nm_ev_tempo(ctx, ticks, (uint32_t)
-											(1000000.0f / powf(2.0f, 3.0f - data[p + 1])));
-									}
+									ti_dirty = true;
+									ti_ticks = ticks;
+									int den = 1 << data[p + 1];
+									// given a ti_tempo and ti_tsden, reverse calculate the MIDI tempo
+									// (reverse of formula above `ti_tempo = ...`)
+									int tempo = ((float)ti_tsden * 15000000.0f) / ti_tempo;
+									ti_tsnum = data[p];
+									ti_tsden = den;
+									// recalculate with new ti_tsden:
+									ti_tempo = ((float)ti_tsden * 15000000.0f) / (float)tempo;
 								}
 								break;
 							case 0x59: // 02 SS MM          Key Signature
@@ -1178,12 +1234,15 @@ bool nm_ev_chanbend(nm_ctx ctx, uint32_t tick, uint16_t channel, float bend){
 	return true;
 }
 
-bool nm_ev_tempo(nm_ctx ctx, uint32_t tick, uint32_t usec_per_quarternote){
+bool nm_ev_tempo(nm_ctx ctx, uint32_t tick, uint8_t num, uint8_t den, float tempo){
+	// `den` must be power of 2 between 1-128
 	nm_wevent wev = nm_alloc(sizeof(nm_wevent_st));
 	if (wev == NULL)
 		return false;
 	wev->ev.type = NM_EV_TEMPO;
-	wev->ev.u.data2i = usec_per_quarternote;
+	wev->ev.data1 = den;
+	wev->ev.channel = num; // stored in channel, oh well
+	wev->ev.u.data2f = tempo;
 	wev_insert(ctx, tick, wev);
 	return true;
 }
@@ -1460,15 +1519,15 @@ void nm_ctx_process(nm_ctx ctx, int sample_len, nm_sample samples){
 				// initialize voice
 				nm_channel chan = &ctx->channels[ev->channel];
 				nm_patch pt = chan->patch;
-				uint8_t pstat = ctx->patchinf_status[pt];
+				uint8_t pic = ctx->patchinf_custom[pt];
 				// 0 = unallocated/default, 1 = custom synth
-				if (pstat == 0){
+				if (pic == 0){
 					// attempt to allocate patch
 					if (ctx->f_patch_setup){
 						if (ctx->f_patch_setup(ctx, ctx->synth, pt, ctx->patchinf[pt]))
-							pstat = 1;
+							pic = 1;
 					}
-					if (pstat == 0){
+					if (pic == 0){
 						// intiailize patchinf to default synth info
 						nm_defpatchinf pi = ctx->patchinf[pt];
 						pi->peak      = melodicpatch[pt].peak;
@@ -1488,9 +1547,9 @@ void nm_ctx_process(nm_ctx ctx, int sample_len, nm_sample samples){
 						else
 							pi->f_wave = wave_triangle;
 					}
-					ctx->patchinf_status[pt] = pstat;
+					ctx->patchinf_custom[pt] = pic;
 				}
-				vc->f_render = pstat == 0 ? NULL : ctx->f_render;
+				vc->f_render = pic == 0 ? NULL : ctx->f_render;
 				vc->synth = ctx->synth;
 				vc->patchinf = ctx->patchinf[pt];
 				vc->patch = pt;
@@ -1532,7 +1591,9 @@ void nm_ctx_process(nm_ctx ctx, int sample_len, nm_sample samples){
 			// TODO: this
 		}
 		else if (ev->type == NM_EV_TEMPO){
-			ctx->usec_per_quarternote = ev->u.data2i;
+			ctx->ts_num = ev->channel;
+			ctx->ts_den = ev->data1;
+			ctx->tempo = ev->u.data2f;
 			recalc_spt(ctx);
 		}
 		else if (ev->type == NM_EV_PATCH){

@@ -132,7 +132,11 @@ int tot_all = 0;
 static void process_midi(const char *file){
 	did_warn = false;
 	printf("%s\n", &file[32]);
-	// TODO: anything?
+
+	nm_ctx nctx = nm_ctx_new(480, 1024, 32, 48000, NULL, 0, 0, NULL, NULL);
+	nm_midi_newfile(nctx, file, midi_warn, NULL);
+	nm_ctx_free(nctx);
+
 	tot_all++;
 	if (did_warn)
 		tot_warn++;
@@ -376,14 +380,15 @@ static sink_val L_help(sink_ctx ctx, int size, sink_val *args, void *user){
 		"  patchname p        # get patch p's (number) descriptive name\n"
 		"  reset tick[, tpq]  # insert reset event with ticks per quarternote\n"
 		"  savemidi 'file'    # save the pending events to a MIDI file\n"
-		"  tempo tick, usecpq # insert tempo event with microseconds per quarternote\n"
+		"  tempo tick, n, d, bpm\n"
+		"                     # insert tempo event with n/d time signature and BPM speed\n"
 		"\nExample:\n"
-		"> reset      0,  50     # 50 ticks per quarternote\n"
-		"> tempo      0, 100000  # 100,000 microseconds per quarternote\n"
-		"> noteplay   0, 100, C4 # play C4 starting at tick 0 for 100 ticks\n"
-		"> noteplay 100, 100, D4 # play D4 starting at tick 100 for 100 ticks\n"
-		"> noteplay 200, 100, E4 # play E4 starting at tick 200 for 100 ticks\n"
-		"> bakeall               # send all pending events to the engine\n"
+		"> reset      0, 50         # 50 ticks per quarternote\n"
+		"> tempo      0, 4, 4, 120  # 4/4 timesig with 120 beats per minute\n"
+		"> noteplay   0, 100, C4    # play C4 starting at tick 0 for 100 ticks\n"
+		"> noteplay 100, 100, D4    # play D4 starting at tick 100 for 100 ticks\n"
+		"> noteplay 200, 100, E4    # play E4 starting at tick 200 for 100 ticks\n"
+		"> bakeall                  # send all pending events to the engine\n"
 		"... the notes play ..."
 	);
 	sink_say(ctx, 1, &help);
@@ -472,7 +477,6 @@ static inline int repl(nm_ctx nctx){
 }
 
 int main(int argc, char **argv){
-	setlocale(LC_ALL, "");
 	// z/Zelda3ocarina.mid              // very small and simple
 	// f/For_Those_About_To_Rock.MID    // 0-size MTrk
 	// TODO:
@@ -481,8 +485,10 @@ int main(int argc, char **argv){
 	//  drums
 	//  poly mode
 	//  omni mode should perform all notes on/off because GM2 doesn't use omni mode
-//	each_midi("/Users/sean/Downloads/midi/data");
-//	return 0;
+	//each_midi("/Users/sean/Downloads/midi/data");
+	//return 0;
+
+	setlocale(LC_ALL, "");
 
 	int res = 1;
 	nm_ctx nctx = NULL;

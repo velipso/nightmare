@@ -3,19 +3,27 @@ include 'nightmare' # required
 using music
 
 for
-	var wave = rand.pick range 4
-	var peak = rand.pick range 1, 11
-	var attk = rand.pick range 1, 21, 2
-	var decy = rand.pick range 1, 21, 2
-	var sust = rand.pick range 1, 11
-	var hrm1 = rand.pick range 0, 11
-	var hrm2 = rand.pick range 0, 11
-	var hrm3 = rand.pick range 0, 11
-	var hrm4 = rand.pick range 0, 11
-	say wave, peak, attk, decy, sust, hrm1, hrm2, hrm3, hrm4
-	reset 0, 50
-	tempo 0, 100000
+	var inst = {
+		# 0, 10, 1, 9, 2, 8, 5, 1, 1
+		# 0, 10, 11, 1, 5, 9, 9, 2, 2
+		# 0, 10, 3, 5, 5, 0, 7, 4, 6
+		#/*
+		(rand.pick range 4),
+		(10),
+		(rand.pick {0.1, 0.2, 0.3, 0.4, 0.6, 0.8, 1, 2, 4, 7, 10, 15, 20, 24}),
+		(rand.pick range 1, 21, 2),
+		(5),
+		(rand.pick range 0, 11),
+		(rand.pick range 0, 11),
+		(rand.pick range 0, 11),
+		(rand.pick range 0, 11)
+		# */
+	}
+	var {wave, peak, attk, decy, sust, hrm1, hrm2, hrm3, hrm4} = inst
+	say inst
+	reset 0, 1
+	tempo 0, 4, 4, 120
 	defpatch 0, wave, peak/10, attk/10, decy/10, sust/10, hrm1/10, hrm2/10, hrm3/10, hrm4/10
-	noteplay 0, 100, C4
+	noteplay 0, 1, C4 + rand.int % 12
 	bakeall
 end
