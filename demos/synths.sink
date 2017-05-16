@@ -2,27 +2,20 @@
 include 'nightmare' # required
 using music
 
-reset 0, 50
-tempo 0, 100000
-for var wave: range 4
-	for var peak: range 0, 1, 0.1
-		for var attack: range 0, 2, 0.2
-			for var decay: range 0, 2, 0.2
-				for var sustain: range 0, 1, 0.1
-					for var h1: range 0, 1, 0.1
-						for var h2: range 0, 1, 0.1
-							for var h3: range 0, 1, 0.1
-								for var h4: range 0, 1, 0.1
-say wave, peak, attack, decay, sustain, h1, h2, h3, h4
-defpatch 0, wave, peak, attack, decay, sustain, h1, h2, h3, h4
-noteplay 0, 100, C4
-bakeall
-								end
-							end
-						end
-					end
-				end
-			end
-		end
-	end
+for
+	var wave = rand.pick range 4
+	var peak = rand.pick range 1, 11
+	var attk = rand.pick range 1, 21, 2
+	var decy = rand.pick range 1, 21, 2
+	var sust = rand.pick range 1, 11
+	var hrm1 = rand.pick range 0, 11
+	var hrm2 = rand.pick range 0, 11
+	var hrm3 = rand.pick range 0, 11
+	var hrm4 = rand.pick range 0, 11
+	say wave, peak, attk, decy, sust, hrm1, hrm2, hrm3, hrm4
+	reset 0, 50
+	tempo 0, 100000
+	defpatch 0, wave, peak/10, attk/10, decy/10, sust/10, hrm1/10, hrm2/10, hrm3/10, hrm4/10
+	noteplay 0, 100, C4
+	bakeall
 end

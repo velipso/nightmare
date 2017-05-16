@@ -1461,15 +1461,14 @@ void nm_ctx_process(nm_ctx ctx, int sample_len, nm_sample samples){
 				nm_channel chan = &ctx->channels[ev->channel];
 				nm_patch pt = chan->patch;
 				uint8_t pstat = ctx->patchinf_status[pt];
-				// 0 = unallocated, 1 = default synth, 2 = custom synth
+				// 0 = unallocated/default, 1 = custom synth
 				if (pstat == 0){
 					// attempt to allocate patch
-					pstat = 1;
 					if (ctx->f_patch_setup){
 						if (ctx->f_patch_setup(ctx, ctx->synth, pt, ctx->patchinf[pt]))
-							pstat = 2;
+							pstat = 1;
 					}
-					if (pstat == 1){
+					if (pstat == 0){
 						// intiailize patchinf to default synth info
 						nm_defpatchinf pi = ctx->patchinf[pt];
 						pi->peak      = melodicpatch[pt].peak;
@@ -1491,7 +1490,7 @@ void nm_ctx_process(nm_ctx ctx, int sample_len, nm_sample samples){
 					}
 					ctx->patchinf_status[pt] = pstat;
 				}
-				vc->f_render = pstat == 1 ? NULL : ctx->f_render;
+				vc->f_render = pstat == 0 ? NULL : ctx->f_render;
 				vc->synth = ctx->synth;
 				vc->patchinf = ctx->patchinf[pt];
 				vc->patch = pt;

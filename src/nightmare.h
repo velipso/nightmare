@@ -487,7 +487,7 @@ struct nm_ctx_struct {
 	nm_voice voices_used;
 	nm_channel channels;
 	uint16_t channel_count;
-	uint8_t patchinf_status[NM__PATCH_END]; // 0 = unallocated, 1 = default synth, 2 = custom synth
+	uint8_t patchinf_status[NM__PATCH_END]; // 0 = unallocated/default, 1 = custom synth
 	void *patchinf[NM__PATCH_END];
 	int notecnt[128];
 };
