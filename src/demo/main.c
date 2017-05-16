@@ -248,7 +248,7 @@ static int sdl_render_audio(void *data){
 	nm_ctx ctx = (nm_ctx)data;
 	while (true){
 		bool hs = hassound(ctx);
-		if (run_mode != 0 && !hs)
+		if (run_mode == 1 && !hs)
 			break;
 		SDL_SemWait(lock_write);
 		memset(sample_buffer, 0, sizeof(nm_sample_st) * sample_buffer_size);
@@ -432,8 +432,11 @@ static inline int repl(nm_ctx nctx){
 			if (!sink_scr_write(scr, bufsize, (uint8_t *)buf))
 				printscrerr(scr);
 			if (sink_scr_level(scr) <= 0){
+				resume:
 				SDL_SemWait(lock_nm);
-				switch (sink_ctx_run(ctx)){
+				sink_run sr = sink_ctx_run(ctx);
+				SDL_SemPost(lock_nm);
+				switch (sr){
 					case SINK_RUN_PASS:
 						done = true;
 						res = 0;
@@ -442,9 +445,9 @@ static inline int repl(nm_ctx nctx){
 						printctxerr(ctx);
 						break;
 					case SINK_RUN_ASYNC:
-						fprintf(stderr, "TODO: REPL invoked async function\n");
-						done = true;
-						break;
+						// bake happened
+						sink_ctx_asyncresult(ctx, sink_bool(true));
+						goto resume;
 					case SINK_RUN_TIMEOUT:
 						fprintf(stderr, "REPL returned timeout (impossible)\n");
 						done = true;
@@ -453,7 +456,6 @@ static inline int repl(nm_ctx nctx){
 						// do nothing
 						break;
 				}
-				SDL_SemPost(lock_nm);
 			}
 			if (!done){
 				while (hassound(nctx))
@@ -486,6 +488,8 @@ int main(int argc, char **argv){
 	nm_ctx nctx = NULL;
 	bool sdl_init = false;
 	FILE *fp = NULL;
+	sink_scr scr = NULL;
+	sink_ctx sctx = NULL;
 
 	#ifndef NDEBUG
 	sdl_init = true;
@@ -528,9 +532,13 @@ int main(int argc, char **argv){
 			fprintf(stderr, "Failed to process midi file: %s\n", argv[1]);
 			goto cleanup;
 		}
+		if (!nm_ctx_bakeall(nctx)){
+			fprintf(stderr, "Out of memory\n");
+			goto cleanup;
+		}
 	}
 	else if (run_mode == 2){
-		sink_scr scr = getscr(SINK_SCR_FILE);
+		scr = getscr(SINK_SCR_FILE);
 		if (scr == NULL){
 			fprintf(stderr, "Out of memory\n");
 			goto cleanup;
@@ -538,32 +546,14 @@ int main(int argc, char **argv){
 
 		if (!sink_scr_loadfile(scr, argv[1])){
 			printscrerr(scr);
-			sink_scr_free(scr);
 			goto cleanup;
 		}
 
-		sink_ctx sctx = getctx(scr, nctx);
+		sctx = getctx(scr, nctx);
 		if (sctx == NULL){
 			fprintf(stderr, "Out of memory\n");
-			sink_scr_free(scr);
 			goto cleanup;
 		}
-
-		sink_run res = sink_ctx_run(sctx);
-		if (res == SINK_RUN_FAIL){
-			printctxerr(sctx);
-			sink_ctx_free(sctx);
-			sink_scr_free(scr);
-			goto cleanup;
-		}
-
-		sink_ctx_free(sctx);
-		sink_scr_free(scr);
-	}
-
-	if (!nm_ctx_bakeall(nctx)){
-		fprintf(stderr, "Out of memory\n");
-		goto cleanup;
 	}
 
 	//nm_ctx_dumpev(nctx);
@@ -604,7 +594,30 @@ int main(int argc, char **argv){
 						SDL_PauseAudioDevice(dev, 0); // begin playing
 						if (run_mode == 0){
 							res = repl(nctx);
-							run_mode = 1;
+							run_mode = 1; // exit thread when no more sound
+						}
+						else if (run_mode == 2){
+							resume:
+							SDL_SemWait(lock_nm);
+							sink_run sr = sink_ctx_run(sctx);
+							SDL_SemPost(lock_nm);
+							if (sr == SINK_RUN_ASYNC){
+								// bake happened
+								sink_ctx_asyncresult(sctx, sink_bool(true));
+								while (hassound(nctx))
+									SDL_Delay(50);
+								goto resume;
+							}
+							if (sr == SINK_RUN_PASS){
+								SDL_SemWait(lock_nm);
+								nm_ctx_bakeall(nctx);
+								SDL_SemPost(lock_nm);
+							}
+							else{
+								printctxerr(sctx);
+								res = 1;
+							}
+							run_mode = 1; // exit thread when no more sound
 						}
 						SDL_WaitThread(thr, NULL);
 					}
@@ -622,6 +635,10 @@ int main(int argc, char **argv){
 	}
 
 	cleanup:
+	if (sctx)
+		sink_ctx_free(sctx);
+	if (scr)
+		sink_scr_free(scr);
 	if (fp)
 		fclose(fp);
 	if (nctx)

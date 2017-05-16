@@ -312,13 +312,13 @@ static sink_val L_bake(sink_ctx ctx, int size, sink_val *args, nm_user u){
 		return sink_abortcstr(ctx, "Invalid ticks; expecting integers");
 	if (!nm_ctx_bake(u->ctx, t))
 		return sink_abortcstr(ctx, "Failed to bake notes");
-	return sink_bool(true);
+	return SINK_ASYNC;
 }
 
 static sink_val L_bakeall(sink_ctx ctx, int size, sink_val *args, nm_user u){
 	if (!nm_ctx_bakeall(u->ctx))
 		return sink_abortcstr(ctx, "Failed to bake notes");
-	return sink_bool(true);
+	return SINK_ASYNC;
 }
 
 static sink_val L_savemidi(sink_ctx ctx, int size, sink_val *args, nm_user u){
