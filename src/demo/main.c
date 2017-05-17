@@ -35,6 +35,7 @@ static inline void catchint(){
 }
 
 const int sample_buffer_size = 1024;
+const int sample_rate = 48000;
 
 static bool fs_isdir(const char *dir){
 	struct stat buf;
@@ -133,7 +134,7 @@ static void process_midi(const char *file){
 	did_warn = false;
 	printf("%s\n", &file[32]);
 
-	nm_ctx nctx = nm_ctx_new(480, 1024, 32, 48000, NULL, 0, 0, NULL, NULL);
+	nm_ctx nctx = nm_ctx_new(480, 1024, 32, sample_rate, NULL, 0, 0, NULL, NULL);
 	nm_midi_newfile(nctx, file, midi_warn, NULL);
 	nm_ctx_free(nctx);
 
@@ -248,6 +249,24 @@ static bool hassound(nm_ctx ctx){
 	return ret;
 }
 
+static inline void print_piano(nm_ctx ctx){
+	for (int i = 0; i < 128; i += 2){
+		bool left = ctx->notecnt[i] > 0;
+		bool right = ctx->notecnt[i + 1] > 0;
+		if (left){
+			if (right)
+				printf("%ls", L"\x2588");
+			else
+				printf("%ls", L"\x258c");
+		}
+		else if (right)
+			printf("%ls", L"\x2590");
+		else
+			printf(" ");
+	}
+	printf("%2X\n", nm_ctx_voicesleft(ctx));
+}
+
 static int sdl_render_audio(void *data){
 	nm_ctx ctx = (nm_ctx)data;
 	while (true){
@@ -260,21 +279,7 @@ static int sdl_render_audio(void *data){
 			SDL_SemWait(lock_nm);
 			nm_ctx_process(ctx, sample_buffer_size, sample_buffer);
 			SDL_SemPost(lock_nm);
-			for (int i = 0; i < 128; i += 2){
-				bool left = ctx->notecnt[i] > 0;
-				bool right = ctx->notecnt[i + 1] > 0;
-				if (left){
-					if (right)
-						printf("%ls", L"\x2588");
-					else
-						printf("%ls", L"\x258c");
-				}
-				else if (right)
-					printf("%ls", L"\x2590");
-				else
-					printf(" ");
-			}
-			printf("%2X\n", nm_ctx_voicesleft(ctx));
+			print_piano(ctx);
 		}
 		#ifndef NDEBUG
 		// crappy click detection
@@ -464,7 +469,7 @@ static inline int repl(nm_ctx nctx){
 			}
 			if (!done){
 				while (hassound(nctx))
-					SDL_Delay(50);
+					SDL_Delay(10);
 				printline(++line, sink_scr_level(scr));
 			}
 			bufsize = 0;
@@ -474,6 +479,72 @@ static inline int repl(nm_ctx nctx){
 	sink_ctx_free(ctx);
 	sink_scr_free(scr);
 	return res;
+}
+
+// write an unsigned 32-bit integer in little endian format
+static inline void write_u32le(FILE *fp, uint32_t v){
+	fputc(v & 0xFF, fp);
+	fputc((v >> 8) & 0xFF, fp);
+	fputc((v >> 16) & 0xFF, fp);
+	fputc((v >> 24) & 0xFF, fp);
+}
+
+// write an unsigned 16-bit integer in little endian format
+static inline void write_u16le(FILE *fp, uint16_t v){
+	fputc(v & 0xFF, fp);
+	fputc((v >> 8) & 0xFF, fp);
+}
+
+static float clampf(float v, float min, float max){
+	return v < min ? min : (v > max ? max : v);
+}
+
+static FILE *wav_start(int rate, const char *file){
+	FILE *fp = fopen(file, "wb");
+	if (fp == NULL)
+		return NULL;
+	write_u32le(fp, 0x46464952);    // 'RIFF'
+	write_u32le(fp, 0);             // rest of file size (overwritten later by sizeall)
+	write_u32le(fp, 0x45564157);    // 'WAVE'
+	write_u32le(fp, 0x20746D66);    // 'fmt '
+	write_u32le(fp, 16);            // size of fmt chunk
+	write_u16le(fp, 1);             // audio format
+	write_u16le(fp, 2);             // stereo
+	write_u32le(fp, rate);          // sample rate
+	write_u32le(fp, rate * 4);      // bytes per second
+	write_u16le(fp, 4);             // block align
+	write_u16le(fp, 16);            // bits per sample
+	write_u32le(fp, 0x61746164);    // 'data'
+	write_u32le(fp, 0);             // size of data chunk (overwritten later by size2)
+	return fp;
+}
+
+static void wav_samples(FILE *fp, int size, nm_sample samples){
+	for (int i = 0; i < size; i++){
+		float L = clampf(samples[i].L, -1, 1);
+		float R = clampf(samples[i].R, -1, 1);
+		int16_t Lv, Rv;
+		if (L < 0)
+			Lv = (int16_t)(L * 32768.0f);
+		else
+			Lv = (int16_t)(L * 32767.0f);
+		if (R < 0)
+			Rv = (int16_t)(R * 32768.0f);
+		else
+			Rv = (int16_t)(R * 32767.0f);
+		write_u16le(fp, (uint16_t)Lv);
+		write_u16le(fp, (uint16_t)Rv);
+	}
+}
+
+static void wav_end(FILE *fp, int totalsamples){
+	uint32_t size2 = totalsamples * 4; // total bytes of data
+	uint32_t sizeall = size2 + 36; // total file size minus 8
+	fseek(fp, 4, SEEK_SET);
+	write_u32le(fp, sizeall);
+	fseek(fp, 40, SEEK_SET);
+	write_u32le(fp, size2);
+	fclose(fp);
 }
 
 int main(int argc, char **argv){
@@ -514,9 +585,11 @@ int main(int argc, char **argv){
 			fprintf(stderr, "Failed to read file: %s\n", argv[1]);
 			printf(
 				"Usage:\n"
-				"  nightmare                 Sink REPL\n"
-				"  nightmare file.mid        Play a MIDI file\n"
-				"  nightmare file.sink       Execute a sink script\n");
+				"  nightmare                    Sink REPL\n"
+				"  nightmare file.mid           Play a MIDI file\n"
+				"  nightmare file.sink          Play results of sink script\n"
+				"  nightmare file.mid out.wav   Render MIDI file to out.wav\n"
+				"  nightmare file.sink out.wav  Render results of sink script to out.wav\n");
 			goto cleanup;
 		}
 		uint8_t filedata[8] = {0};
@@ -526,8 +599,12 @@ int main(int argc, char **argv){
 		run_mode = nm_ismidi(filedata) ? 1 : 2;
 	}
 
+	char *outfile = NULL;
+	if (argc >= 3)
+		outfile = argv[2];
+
 	// create a nightmare context
-	nctx = nm_ctx_new(480, 1024, 32, 48000, NULL, 0, 0, NULL, NULL);
+	nctx = nm_ctx_new(480, 1024, outfile ? 2048 : 32, sample_rate, NULL, 0, 0, NULL, NULL);
 	if (nctx == NULL){
 		fprintf(stderr, "Out of memory\n");
 		goto cleanup;
@@ -564,6 +641,40 @@ int main(int argc, char **argv){
 
 	//nm_ctx_dumpev(nctx);
 
+	if (outfile){
+		if (run_mode == 2){
+			resume2:;
+			sink_run sr = sink_ctx_run(sctx);
+			if (sr == SINK_RUN_ASYNC){
+				// bake happened
+				sink_ctx_asyncresult(sctx, sink_bool(true));
+				goto resume2;
+			}
+			if (sr == SINK_RUN_PASS)
+				nm_ctx_bakeall(nctx);
+			else{
+				printctxerr(sctx);
+				goto cleanup;
+			}
+		}
+		FILE *fp = wav_start(sample_rate, outfile);
+		if (fp == NULL){
+			fprintf(stderr, "Failed to write to file: %s\n", outfile);
+			goto cleanup;
+		}
+		int tot = 0;
+		while (nm_ctx_eventsleft(nctx) > 0 || nm_ctx_voicesleft(nctx) > 0){
+			memset(sample_buffer, 0, sizeof(nm_sample_st) * sample_buffer_size);
+			nm_ctx_process(nctx, sample_buffer_size, sample_buffer);
+			wav_samples(fp, sample_buffer_size, sample_buffer);
+			tot += sample_buffer_size;
+			print_piano(nctx);
+		}
+		wav_end(fp, tot);
+		res = 0;
+		goto cleanup;
+	}
+
 	#ifdef NDEBUG
 	sdl_init = true;
 	SDL_Init(SDL_INIT_AUDIO);
@@ -572,7 +683,7 @@ int main(int argc, char **argv){
 	SDL_AudioSpec want, have;
 	SDL_AudioDeviceID dev;
 	SDL_memset(&want, 0, sizeof(want));
-	want.freq = 48000;
+	want.freq = sample_rate;
 	want.format = AUDIO_F32;
 	want.channels = 2;
 	want.samples = sample_buffer_size;
@@ -611,18 +722,17 @@ int main(int argc, char **argv){
 								// bake happened
 								sink_ctx_asyncresult(sctx, sink_bool(true));
 								while (hassound(nctx))
-									SDL_Delay(50);
+									SDL_Delay(10);
 								goto resume;
 							}
 							if (sr == SINK_RUN_PASS){
 								SDL_SemWait(lock_nm);
 								nm_ctx_bakeall(nctx);
 								SDL_SemPost(lock_nm);
+								res = 0;
 							}
-							else{
+							else
 								printctxerr(sctx);
-								res = 1;
-							}
 							run_mode = 1; // exit thread when no more sound
 						}
 						SDL_WaitThread(thr, NULL);

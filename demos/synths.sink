@@ -2,12 +2,12 @@
 include 'nightmare' # required
 using music
 
-for
+for var l: range 100
 	var inst = {
-		# 0, 10, 1, 9, 2, 8, 5, 1, 1
+		0, 10, 1, 9, 2, 8, 5, 1, 1
 		# 0, 10, 11, 1, 5, 9, 9, 2, 2
 		# 0, 10, 3, 5, 5, 0, 7, 4, 6
-		#/*
+		/*
 		(rand.pick range 4),
 		(10),
 		(rand.pick {0.1, 0.2, 0.3, 0.4, 0.6, 0.8, 1, 2, 4, 7, 10, 15, 20, 24}),

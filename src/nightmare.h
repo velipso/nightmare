@@ -484,6 +484,7 @@ struct nm_ctx_struct {
 	uint16_t ticks_per_quarternote;
 	int samples_per_sec;
 	double ticks;
+	uint32_t last_bake_ticks;
 	double samples_per_tick;
 	nm_voice voices_free;
 	nm_voice voices_used;

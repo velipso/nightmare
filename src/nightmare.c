@@ -343,6 +343,7 @@ nm_ctx nm_ctx_new(uint16_t ticks_per_quarternote, uint16_t channels, int voices,
 
 	ctx->samples_per_sec = samples_per_sec;
 	ctx->ticks = 0;
+	ctx->last_bake_ticks = 0;
 	reset_tempo(ctx, ticks_per_quarternote);
 
 	ctx->channel_count = channels;
@@ -732,7 +733,7 @@ bool nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_
 						}
 						else{
 							if (!nm_ev_noteon(ctx, ticks, chan_base + (msg & 0xF), note,
-								vel == 0x40 ? 0.5f : (float)vel / 127.0f))
+								vel == 0x40 ? 0.5f : ((float)vel / 127.0f)))
 								return false;
 						}
 					}
@@ -1321,6 +1322,9 @@ bool nm_ctx_bake(nm_ctx ctx, uint32_t ticks){
 		ctx->ev_size = newsize;
 	}
 
+	if (ctx->last_bake_ticks < ctx->ticks)
+		ctx->last_bake_ticks = ctx->ticks;
+
 	// copy over the events
 	wev = ctx->wevents;
 	bool found_ins = false;
@@ -1328,12 +1332,14 @@ bool nm_ctx_bake(nm_ctx ctx, uint32_t ticks){
 		if (wev == ctx->ins_wevent)
 			found_ins = true;
 		ctx->events[ctx->ev_write] = wev->ev;
-		ctx->events[ctx->ev_write].tick += ctx->ticks;
+		ctx->events[ctx->ev_write].tick += ctx->last_bake_ticks;
 		nm_wevent del = wev;
 		wev = wev->next;
 		nm_free(del);
 		ctx->ev_write = (ctx->ev_write + 1) % ctx->ev_size;
 	}
+
+	ctx->last_bake_ticks += ticks;
 
 	// update wevents/ins_wevent/last_wevent
 	ctx->wevents = wev;
@@ -1432,7 +1438,7 @@ static void render_sect(nm_ctx ctx, int len, nm_sample samples){
 				vi->dfade = dfade;
 			}
 			if (fade > 0 || dfade > 0){
-				float amp = vc->vel * peak;
+				float amp = vc->vel * peak * 0.3f;
 				sustain *= amp;
 				float cyc = vc->cyc;
 				float dcyc = vc->dcyc;
@@ -1442,6 +1448,7 @@ static void render_sect(nm_ctx ctx, int len, nm_sample samples){
 					if (dfade > 0){
 						fade += dfade;
 						if (fade >= amp){
+							fade = amp;
 							dfade = -1.0f / (decay * ctx->samples_per_sec);
 							vi->dfade = dfade;
 						}
@@ -1507,6 +1514,7 @@ void nm_ctx_process(nm_ctx ctx, int sample_len, nm_sample samples){
 				ctx->voices_free = vc;
 				vc = next;
 			}
+			ctx->voices_used = NULL;
 		}
 		else if (ev->type == NM_EV_NOTEON){
 			nm_voice vc = ctx->voices_free;
