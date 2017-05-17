@@ -183,5 +183,6 @@ clang                                      \
 	$LINK                                  \
 	"$SRC_DIR/nightmare.c"                 \
 	"$SRC_DIR/sink_nightmare.c"            \
+	"$SRC_DIR/demo/compressor.c"           \
 	"$SRC_DIR/demo/sink.c"                 \
 	"$SRC_DIR/demo/main.c"

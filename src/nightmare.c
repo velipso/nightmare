@@ -1438,7 +1438,7 @@ static void render_sect(nm_ctx ctx, int len, nm_sample samples){
 				vi->dfade = dfade;
 			}
 			if (fade > 0 || dfade > 0){
-				float amp = vc->vel * peak * 0.3f;
+				float amp = vc->vel * peak;
 				sustain *= amp;
 				float cyc = vc->cyc;
 				float dcyc = vc->dcyc;

@@ -5,6 +5,7 @@
 #include "SDL.h"
 #include "../nightmare.h"
 #include "../sink_nightmare.h"
+#include "compressor.h"
 
 #include <stdio.h>
 #include <stdbool.h>
@@ -36,6 +37,7 @@ static inline void catchint(){
 
 const int sample_buffer_size = 1024;
 const int sample_rate = 48000;
+static sf_compressor_state_st compressor;
 
 static bool fs_isdir(const char *dir){
 	struct stat buf;
@@ -279,6 +281,8 @@ static int sdl_render_audio(void *data){
 			SDL_SemWait(lock_nm);
 			nm_ctx_process(ctx, sample_buffer_size, sample_buffer);
 			SDL_SemPost(lock_nm);
+			sf_compressor_process(&compressor, sample_buffer_size, (sf_sample_st *)sample_buffer,
+				(sf_sample_st *)sample_buffer);
 			print_piano(ctx);
 		}
 		#ifndef NDEBUG
@@ -603,6 +607,9 @@ int main(int argc, char **argv){
 	if (argc >= 3)
 		outfile = argv[2];
 
+	// initialize compressor
+	sf_defaultcomp(&compressor, sample_rate);
+
 	// create a nightmare context
 	nctx = nm_ctx_new(480, 1024, outfile ? 2048 : 32, sample_rate, NULL, 0, 0, NULL, NULL);
 	if (nctx == NULL){
@@ -666,6 +673,8 @@ int main(int argc, char **argv){
 		while (nm_ctx_eventsleft(nctx) > 0 || nm_ctx_voicesleft(nctx) > 0){
 			memset(sample_buffer, 0, sizeof(nm_sample_st) * sample_buffer_size);
 			nm_ctx_process(nctx, sample_buffer_size, sample_buffer);
+			sf_compressor_process(&compressor, sample_buffer_size, (sf_sample_st *)sample_buffer,
+				(sf_sample_st *)sample_buffer);
 			wav_samples(fp, sample_buffer_size, sample_buffer);
 			tot += sample_buffer_size;
 			print_piano(nctx);
