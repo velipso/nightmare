@@ -376,7 +376,7 @@ static sink_val L_help(sink_ctx ctx, int size, sink_val *args, void *user){
 		"Help: Nightmare Sink API\n"
 		"  bake tick          # send the events within `tick` to the engine\n"
 		"  bakeall            # send all pending events to the engine\n"
-		"  channel c          # select a channel for future commands\n"
+		"  channel [c]        # select a channel for future commands\n"
 		"  defpatch p, wave, peak, attack, decay, sustain, harmonic1, h2, h3, h4\n"
 		"                     # overwrite the default patch parameters for patch p\n"
 		"  note 'C4'          # convert a string to a note number\n"
