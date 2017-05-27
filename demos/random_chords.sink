@@ -10,9 +10,9 @@ var chords = {
 	{0, 3, 7}  # minor chord
 }
 for var m: range 10
-	var base = (note 'C3') + rand.int % 24
+	var base = C3 + rand.int % 24
 	var ch = rand.pick chords
-	var nb = (note 'C1') + base % 12
+	var nb = C1 + base % 12
 	var len = 25 * (2 + rand.int % 2)
 	noteplay t, len, nb
 	for var offset: ch

@@ -336,7 +336,7 @@ static sink_val L_savemidi(sink_ctx ctx, int size, sink_val *args, nm_user u){
 }
 
 void sink_nightmare_scr(sink_scr scr){
-	sink_scr_inc(scr, "nightmare",
+	sink_scr_incbody(scr, "nightmare",
 		"namespace music;"
 		"enum "
 		#define X(en, code, name) #en ", "

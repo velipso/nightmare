@@ -376,7 +376,7 @@ static sink_val L_help(sink_ctx ctx, int size, sink_val *args, void *user){
 		"Help: Nightmare Sink API\n"
 		"  bake tick          # send the events within `tick` to the engine\n"
 		"  bakeall            # send all pending events to the engine\n"
-		"  channel            # select a channel for future commands\n"
+		"  channel c          # select a channel for future commands\n"
 		"  defpatch p, wave, peak, attack, decay, sustain, harmonic1, h2, h3, h4\n"
 		"                     # overwrite the default patch parameters for patch p\n"
 		"  note 'C4'          # convert a string to a note number\n"
@@ -384,7 +384,7 @@ static sink_val L_help(sink_ctx ctx, int size, sink_val *args, void *user){
 		"  note {'C', 4}      # convert a list {note, octave} to a note number\n"
 		"  noteplay tick, dur, note[, vel]\n"
 		"                     # insert a note to play for duration\n"
-		"  patch p            # switch patch for the current channel to p (number)\n"
+		"  patch tick, p      # switch patch for the current channel to p (number)\n"
 		"  patchcat p         # get patch p's (number) category name\n"
 		"  patchname p        # get patch p's (number) descriptive name\n"
 		"  reset tick[, tpq]  # insert reset event with ticks per quarternote\n"
@@ -611,7 +611,7 @@ int main(int argc, char **argv){
 	sf_defaultcomp(&compressor, sample_rate);
 
 	// create a nightmare context
-	nctx = nm_ctx_new(480, 1024, outfile ? 2048 : 32, sample_rate, NULL, 0, 0, NULL, NULL);
+	nctx = nm_ctx_new(480, 1024, outfile ? 4096 : 32, sample_rate, NULL, 0, 0, NULL, NULL);
 	if (nctx == NULL){
 		fprintf(stderr, "Out of memory\n");
 		goto cleanup;

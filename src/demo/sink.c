@@ -18,10 +18,10 @@
 #		undef NDEBUG
 #	endif
 #	include <assert.h>
-#	define debug(msg)         printf("> %-10s: %s\n", __func__, msg)
-#	define debugf(msg, ...)   printf("> %-10s: " msg "\n", __func__, __VA_ARGS__)
-#	define oplog(msg)         printf("%% %s\n", msg)
-#	define oplogf(msg, ...)   printf("%% " msg "\n", __VA_ARGS__)
+#	define debug(msg)         fprintf(stderr, "> %-10s: %s\n", __func__, msg)
+#	define debugf(msg, ...)   fprintf(stderr, "> %-10s: " msg "\n", __func__, __VA_ARGS__)
+#	define oplog(msg)         fprintf(stderr, "%% %s\n", msg)
+#	define oplogf(msg, ...)   fprintf(stderr, "%% " msg "\n", __VA_ARGS__)
 #else
 #	ifndef NDEBUG
 #		define NDEBUG
@@ -632,6 +632,7 @@ static inline uint64_t native_hash(int size, const uint8_t *bytes){
 // opcodes
 //
 
+// key: SINGLEBYTE  [TWOBYTES]  [[FOURBYTES]]  [[[EIGHTBYTES]]]
 typedef enum {
 	OP_NOP             = 0x00, //
 	OP_MOVE            = 0x01, // [TGT], [SRC]
@@ -643,7 +644,7 @@ typedef enum {
 	OP_NUMN16          = 0x07, // [TGT], [VALUE]
 	OP_NUMP32          = 0x08, // [TGT], [[VALUE]]
 	OP_NUMN32          = 0x09, // [TGT], [[VALUE]]
-	OP_NUMDBL          = 0x0A, // [TGT], [[[[VALUE]]]]
+	OP_NUMDBL          = 0x0A, // [TGT], [[[VALUE]]]
 	OP_STR             = 0x0B, // [TGT], [INDEX]
 	OP_LIST            = 0x0C, // [TGT], HINT
 	OP_ISNUM           = 0x0D, // [TGT], [SRC]
@@ -714,9 +715,9 @@ typedef enum {
 	OP_NUM_BIN         = 0x4E, // [TGT], [SRC1], [SRC2]
 	OP_INT_NEW         = 0x4F, // [TGT], [SRC]
 	OP_INT_NOT         = 0x50, // [TGT], [SRC]
-	OP_INT_AND         = 0x51, // [TGT], [SRC1], [SRC2]
-	OP_INT_OR          = 0x52, // [TGT], [SRC1], [SRC2]
-	OP_INT_XOR         = 0x53, // [TGT], [SRC1], [SRC2]
+	OP_INT_AND         = 0x51, // [TGT], ARGCOUNT, [ARGS]...
+	OP_INT_OR          = 0x52, // [TGT], ARGCOUNT, [ARGS]...
+	OP_INT_XOR         = 0x53, // [TGT], ARGCOUNT, [ARGS]...
 	OP_INT_SHL         = 0x54, // [TGT], [SRC1], [SRC2]
 	OP_INT_SHR         = 0x55, // [TGT], [SRC1], [SRC2]
 	OP_INT_SAR         = 0x56, // [TGT], [SRC1], [SRC2]
@@ -746,7 +747,7 @@ typedef enum {
 	OP_STR_UPPER       = 0x6E, // [TGT], [SRC]
 	OP_STR_TRIM        = 0x6F, // [TGT], [SRC]
 	OP_STR_REV         = 0x70, // [TGT], [SRC]
-	OP_STR_REP         = 0x71, // [TGT], [SRC]
+	OP_STR_REP         = 0x71, // [TGT], [SRC1], [SRC2]
 	OP_STR_LIST        = 0x72, // [TGT], [SRC]
 	OP_STR_BYTE        = 0x73, // [TGT], [SRC1], [SRC2]
 	OP_STR_HASH        = 0x74, // [TGT], [SRC1], [SRC2]
@@ -780,12 +781,220 @@ typedef enum {
 	OP_GC_GETLEVEL     = 0x90, // [TGT]
 	OP_GC_SETLEVEL     = 0x91, // [TGT], [SRC]
 	OP_GC_RUN          = 0x92, // [TGT]
+	// RESERVED        = 0xFD,
 	// fake ops
 	OP_GT              = 0x1F0,
 	OP_GTE             = 0x1F1,
 	OP_PICK            = 0x1F2,
 	OP_INVALID         = 0x1F3
 } op_enum;
+
+typedef enum {
+	OPPC_INVALID,
+	OPPC_STR,        // [VAR], [INDEX]
+	OPPC_CMDHEAD,    // LEVEL, RESTPOS
+	OPPC_CMDTAIL,    //
+	OPPC_JUMP,       // [[LOCATION]]
+	OPPC_VJUMP,      // [VAR], [[LOCATION]]
+	OPPC_CALL,       // [VAR], [[LOCATION]], ARGCOUNT, [VARS]...
+	OPPC_NATIVE,     // [VAR], [INDEX], ARGCOUNT, [VARS]...
+	OPPC_RETURNTAIL, // [[LOCATION]], ARGCOUNT, [VARS]...
+	OPPC_VVVV,       // [VAR], [VAR], [VAR], [VAR]
+	OPPC_VVV,        // [VAR], [VAR], [VAR]
+	OPPC_VV,         // [VAR], [VAR]
+	OPPC_V,          // [VAR]
+	OPPC_EMPTY,      // nothing
+	OPPC_VA,         // [VAR], ARGCOUNT, [VARS]...
+	OPPC_VN,         // [VAR], DATA
+	OPPC_VNN,        // [VAR], [DATA]
+	OPPC_VNNNN,      // [VAR], [[DATA]]
+	OPPC_VNNNNNNNN   // [VAR], [[[DATA]]]
+} op_pcat;
+
+// lookup table for categorizing the operator types
+static inline op_pcat op_paramcat(op_enum op){
+	switch (op){
+		case OP_NOP            : return OPPC_EMPTY;
+		case OP_MOVE           : return OPPC_VV;
+		case OP_INC            : return OPPC_V;
+		case OP_NIL            : return OPPC_V;
+		case OP_NUMP8          : return OPPC_VN;
+		case OP_NUMN8          : return OPPC_VN;
+		case OP_NUMP16         : return OPPC_VNN;
+		case OP_NUMN16         : return OPPC_VNN;
+		case OP_NUMP32         : return OPPC_VNNNN;
+		case OP_NUMN32         : return OPPC_VNNNN;
+		case OP_NUMDBL         : return OPPC_VNNNNNNNN;
+		case OP_STR            : return OPPC_STR;
+		case OP_LIST           : return OPPC_VN;
+		case OP_ISNUM          : return OPPC_VV;
+		case OP_ISSTR          : return OPPC_VV;
+		case OP_ISLIST         : return OPPC_VV;
+		case OP_NOT            : return OPPC_VV;
+		case OP_SIZE           : return OPPC_VV;
+		case OP_TONUM          : return OPPC_VV;
+		case OP_CAT            : return OPPC_VA;
+		case OP_LT             : return OPPC_VVV;
+		case OP_LTE            : return OPPC_VVV;
+		case OP_NEQ            : return OPPC_VVV;
+		case OP_EQU            : return OPPC_VVV;
+		case OP_GETAT          : return OPPC_VVV;
+		case OP_SLICE          : return OPPC_VVVV;
+		case OP_SETAT          : return OPPC_VVV;
+		case OP_SPLICE         : return OPPC_VVVV;
+		case OP_JUMP           : return OPPC_JUMP;
+		case OP_JUMPTRUE       : return OPPC_VJUMP;
+		case OP_JUMPFALSE      : return OPPC_VJUMP;
+		case OP_CMDHEAD        : return OPPC_CMDHEAD;
+		case OP_CMDTAIL        : return OPPC_CMDTAIL;
+		case OP_CALL           : return OPPC_CALL;
+		case OP_NATIVE         : return OPPC_NATIVE;
+		case OP_RETURN         : return OPPC_V;
+		case OP_RETURNTAIL     : return OPPC_RETURNTAIL;
+		case OP_RANGE          : return OPPC_VVVV;
+		case OP_ORDER          : return OPPC_VVV;
+		case OP_SAY            : return OPPC_VA;
+		case OP_WARN           : return OPPC_VA;
+		case OP_ASK            : return OPPC_VA;
+		case OP_EXIT           : return OPPC_VA;
+		case OP_ABORT          : return OPPC_VA;
+		case OP_NUM_NEG        : return OPPC_VV;
+		case OP_NUM_ADD        : return OPPC_VVV;
+		case OP_NUM_SUB        : return OPPC_VVV;
+		case OP_NUM_MUL        : return OPPC_VVV;
+		case OP_NUM_DIV        : return OPPC_VVV;
+		case OP_NUM_MOD        : return OPPC_VVV;
+		case OP_NUM_POW        : return OPPC_VVV;
+		case OP_NUM_ABS        : return OPPC_VV;
+		case OP_NUM_SIGN       : return OPPC_VV;
+		case OP_NUM_MAX        : return OPPC_VA;
+		case OP_NUM_MIN        : return OPPC_VA;
+		case OP_NUM_CLAMP      : return OPPC_VVVV;
+		case OP_NUM_FLOOR      : return OPPC_VV;
+		case OP_NUM_CEIL       : return OPPC_VV;
+		case OP_NUM_ROUND      : return OPPC_VV;
+		case OP_NUM_TRUNC      : return OPPC_VV;
+		case OP_NUM_NAN        : return OPPC_V;
+		case OP_NUM_INF        : return OPPC_V;
+		case OP_NUM_ISNAN      : return OPPC_VV;
+		case OP_NUM_ISFINITE   : return OPPC_VV;
+		case OP_NUM_SIN        : return OPPC_VV;
+		case OP_NUM_COS        : return OPPC_VV;
+		case OP_NUM_TAN        : return OPPC_VV;
+		case OP_NUM_ASIN       : return OPPC_VV;
+		case OP_NUM_ACOS       : return OPPC_VV;
+		case OP_NUM_ATAN       : return OPPC_VV;
+		case OP_NUM_ATAN2      : return OPPC_VVV;
+		case OP_NUM_LOG        : return OPPC_VV;
+		case OP_NUM_LOG2       : return OPPC_VV;
+		case OP_NUM_LOG10      : return OPPC_VV;
+		case OP_NUM_EXP        : return OPPC_VV;
+		case OP_NUM_LERP       : return OPPC_VVVV;
+		case OP_NUM_HEX        : return OPPC_VVV;
+		case OP_NUM_OCT        : return OPPC_VVV;
+		case OP_NUM_BIN        : return OPPC_VVV;
+		case OP_INT_NEW        : return OPPC_VV;
+		case OP_INT_NOT        : return OPPC_VV;
+		case OP_INT_AND        : return OPPC_VA;
+		case OP_INT_OR         : return OPPC_VA;
+		case OP_INT_XOR        : return OPPC_VA;
+		case OP_INT_SHL        : return OPPC_VVV;
+		case OP_INT_SHR        : return OPPC_VVV;
+		case OP_INT_SAR        : return OPPC_VVV;
+		case OP_INT_ADD        : return OPPC_VVV;
+		case OP_INT_SUB        : return OPPC_VVV;
+		case OP_INT_MUL        : return OPPC_VVV;
+		case OP_INT_DIV        : return OPPC_VVV;
+		case OP_INT_MOD        : return OPPC_VVV;
+		case OP_INT_CLZ        : return OPPC_VV;
+		case OP_RAND_SEED      : return OPPC_VV;
+		case OP_RAND_SEEDAUTO  : return OPPC_V;
+		case OP_RAND_INT       : return OPPC_V;
+		case OP_RAND_NUM       : return OPPC_V;
+		case OP_RAND_GETSTATE  : return OPPC_V;
+		case OP_RAND_SETSTATE  : return OPPC_VV;
+		case OP_RAND_PICK      : return OPPC_VV;
+		case OP_RAND_SHUFFLE   : return OPPC_VV;
+		case OP_STR_NEW        : return OPPC_VA;
+		case OP_STR_SPLIT      : return OPPC_VVV;
+		case OP_STR_REPLACE    : return OPPC_VVVV;
+		case OP_STR_BEGINS     : return OPPC_VVV;
+		case OP_STR_ENDS       : return OPPC_VVV;
+		case OP_STR_PAD        : return OPPC_VVV;
+		case OP_STR_FIND       : return OPPC_VVVV;
+		case OP_STR_RFIND      : return OPPC_VVVV;
+		case OP_STR_LOWER      : return OPPC_VV;
+		case OP_STR_UPPER      : return OPPC_VV;
+		case OP_STR_TRIM       : return OPPC_VV;
+		case OP_STR_REV        : return OPPC_VV;
+		case OP_STR_REP        : return OPPC_VVV;
+		case OP_STR_LIST       : return OPPC_VV;
+		case OP_STR_BYTE       : return OPPC_VVV;
+		case OP_STR_HASH       : return OPPC_VVV;
+		case OP_UTF8_VALID     : return OPPC_VV;
+		case OP_UTF8_LIST      : return OPPC_VV;
+		case OP_UTF8_STR       : return OPPC_VV;
+		case OP_STRUCT_SIZE    : return OPPC_VV;
+		case OP_STRUCT_STR     : return OPPC_VVV;
+		case OP_STRUCT_LIST    : return OPPC_VVV;
+		case OP_LIST_NEW       : return OPPC_VVV;
+		case OP_LIST_SHIFT     : return OPPC_VV;
+		case OP_LIST_POP       : return OPPC_VV;
+		case OP_LIST_PUSH      : return OPPC_VVV;
+		case OP_LIST_UNSHIFT   : return OPPC_VVV;
+		case OP_LIST_APPEND    : return OPPC_VVV;
+		case OP_LIST_PREPEND   : return OPPC_VVV;
+		case OP_LIST_FIND      : return OPPC_VVVV;
+		case OP_LIST_RFIND     : return OPPC_VVVV;
+		case OP_LIST_JOIN      : return OPPC_VVV;
+		case OP_LIST_REV       : return OPPC_VV;
+		case OP_LIST_STR       : return OPPC_VV;
+		case OP_LIST_SORT      : return OPPC_VV;
+		case OP_LIST_RSORT     : return OPPC_VV;
+		case OP_PICKLE_JSON    : return OPPC_VV;
+		case OP_PICKLE_BIN     : return OPPC_VV;
+		case OP_PICKLE_VAL     : return OPPC_VV;
+		case OP_PICKLE_VALID   : return OPPC_VV;
+		case OP_PICKLE_SIBLING : return OPPC_VV;
+		case OP_PICKLE_CIRCULAR: return OPPC_VV;
+		case OP_PICKLE_COPY    : return OPPC_VV;
+		case OP_GC_GETLEVEL    : return OPPC_V;
+		case OP_GC_SETLEVEL    : return OPPC_VV;
+		case OP_GC_RUN         : return OPPC_V;
+		case OP_GT             : return OPPC_INVALID;
+		case OP_GTE            : return OPPC_INVALID;
+		case OP_PICK           : return OPPC_INVALID;
+		case OP_INVALID        : return OPPC_INVALID;
+	}
+	return OPPC_INVALID;
+}
+
+#ifdef SINK_DEBUG
+static const char *op_pcat_name(op_pcat opc){
+	switch (opc){
+		case OPPC_INVALID   : return "OPPC_INVALID";
+		case OPPC_STR       : return "OPPC_STR";
+		case OPPC_CMDHEAD   : return "OPPC_CMDHEAD";
+		case OPPC_CMDTAIL   : return "OPPC_CMDTAIL";
+		case OPPC_JUMP      : return "OPPC_JUMP";
+		case OPPC_VJUMP     : return "OPPC_VJUMP";
+		case OPPC_CALL      : return "OPPC_CALL";
+		case OPPC_NATIVE    : return "OPPC_NATIVE";
+		case OPPC_RETURNTAIL: return "OPPC_RETURNTAIL";
+		case OPPC_VVVV      : return "OPPC_VVVV";
+		case OPPC_VVV       : return "OPPC_VVV";
+		case OPPC_VV        : return "OPPC_VV";
+		case OPPC_V         : return "OPPC_V";
+		case OPPC_EMPTY     : return "OPPC_EMPTY";
+		case OPPC_VA        : return "OPPC_VA";
+		case OPPC_VN        : return "OPPC_VN";
+		case OPPC_VNN       : return "OPPC_VNN";
+		case OPPC_VNNNN     : return "OPPC_VNNNN";
+		case OPPC_VNNNNNNNN : return "OPPC_VNNNNNNNN";
+	}
+	return "Unknown";
+}
+#endif
 
 static inline void op_move(list_byte b, varloc_st tgt, varloc_st src){
 	if (tgt.frame == src.frame && tgt.index == src.index)
@@ -1538,6 +1747,8 @@ static inline int tok_midPrecedence(tok tk){
 	else if (k == KS_SLASHEQU  ) return 20;
 	else if (k == KS_CARETEQU  ) return 20;
 	else if (k == KS_TILDEEQU  ) return 20;
+	else if (k == KS_AMP2EQU   ) return 20;
+	else if (k == KS_PIPE2EQU  ) return 20;
 	assert(false);
 	return -1;
 }
@@ -4105,6 +4316,10 @@ static prr_st parser_process(parser pr, filepos_st flp, list_ptr stmts){
 				parser_push(pr, PRS_BODY);
 				return prr_more();
 			}
+			else if (tok_isKS(tk1, KS_COLON)){
+				st->state = PRS_FOR_VARS_DONE;
+				return prr_more();
+			}
 			st->state = PRS_FOR_VARS;
 			if (tok_isKS(tk1, KS_VAR)){
 				st->forVar = true;
@@ -4887,7 +5102,7 @@ typedef struct {
 			frame fr; // not freed by nsname_free
 			label lbl; // not feed by nsname_free
 		} cmdLocal;
-		int index;
+		uint64_t hash;
 		struct {
 			op_enum opcode;
 			int params;
@@ -4965,11 +5180,11 @@ static inline nsname nsname_cmdLocal(list_byte name, frame fr, label lbl){
 	return nsn;
 }
 
-static inline nsname nsname_cmdNative(list_byte name, int index){
+static inline nsname nsname_cmdNative(list_byte name, uint64_t hash){
 	nsname nsn = mem_alloc(sizeof(nsname_st));
 	nsn->name = list_byte_newcopy(name);
 	nsn->type = NSN_CMD_NATIVE;
-	nsn->u.index = index;
+	nsn->u.hash = hash;
 	return nsn;
 }
 
@@ -5370,6 +5585,7 @@ static sta_st symtbl_addTemp(symtbl sym){
 }
 
 static inline void symtbl_clearTemp(symtbl sym, varloc_st vlc){
+	assert(!varloc_isnull(vlc));
 	if (vlc.frame == sym->fr->level && sym->fr->vars->vals[vlc.index] == FVR_TEMP_INUSE)
 		sym->fr->vars->vals[vlc.index] = FVR_TEMP_AVAIL;
 }
@@ -5467,7 +5683,7 @@ static sta_st symtbl_addCmdLocal(symtbl sym, list_ptr names, label lbl){
 	return sta_ok();
 }
 
-static sta_st symtbl_addCmdNative(symtbl sym, list_ptr names, int index){
+static sta_st symtbl_addCmdNative(symtbl sym, list_ptr names, uint64_t hash){
 	sfn_st nsr = symtbl_findNamespace(sym, names, names->size - 1);
 	if (nsr.type == SFN_ERROR)
 		return sta_error(nsr.u.msg);
@@ -5480,11 +5696,11 @@ static sta_st symtbl_addCmdNative(symtbl sym, list_ptr names, int index){
 					sink_format("Cannot redefine \"%.*s\"", nsn->name->size, nsn->name->bytes));
 			}
 			nsname_free(ns->names->ptrs[i]);
-			ns->names->ptrs[i] = nsname_cmdNative(names->ptrs[names->size - 1], index);
+			ns->names->ptrs[i] = nsname_cmdNative(names->ptrs[names->size - 1], hash);
 			return sta_ok();
 		}
 	}
-	list_ptr_push(ns->names, nsname_cmdNative(names->ptrs[names->size - 1], index));
+	list_ptr_push(ns->names, nsname_cmdNative(names->ptrs[names->size - 1], hash));
 	return sta_ok();
 }
 
@@ -5551,9 +5767,9 @@ static inline void symtbl_loadStdlib(symtbl sym){
 	nss = NSS("int"); symtbl_pushNamespace(sym, nss); list_ptr_free(nss);
 		SAC(sym, "new"       , OP_INT_NEW        ,  1);
 		SAC(sym, "not"       , OP_INT_NOT        ,  1);
-		SAC(sym, "and"       , OP_INT_AND        ,  2);
-		SAC(sym, "or"        , OP_INT_OR         ,  2);
-		SAC(sym, "xor"       , OP_INT_XOR        ,  2);
+		SAC(sym, "and"       , OP_INT_AND        , -1);
+		SAC(sym, "or"        , OP_INT_OR         , -1);
+		SAC(sym, "xor"       , OP_INT_XOR        , -1);
 		SAC(sym, "shl"       , OP_INT_SHL        ,  2);
 		SAC(sym, "shr"       , OP_INT_SHR        ,  2);
 		SAC(sym, "sar"       , OP_INT_SAR        ,  2);
@@ -5662,6 +5878,195 @@ static inline program program_new(bool repl){
 	prg->ops = list_byte_new();
 	prg->repl = repl;
 	return prg;
+}
+
+static bool program_validate(program prg){
+	int pc = 0;
+	int level = 0;
+	bool wasjump = false;
+	uint32_t jumploc;
+	uint32_t jumplocs[256];
+	list_byte ops = prg->ops;
+	int A, B, C, D;
+
+	// holds alignment information
+	// op_actual: the actual alignment of each byte
+	//   0 = invalid target, 1 = valid jump target, 2 = valid call target
+	uint8_t *op_actual = mem_alloc(sizeof(uint8_t) * ops->size);
+	memset(op_actual, 0, sizeof(uint8_t) * ops->size);
+	// op_need: the required alignment of each byte
+	//   0 = don't care, 1 = valid jump target, 2 = valid call target
+	uint8_t *op_need = mem_alloc(sizeof(uint8_t) * ops->size);
+	memset(op_need, 0, sizeof(uint8_t) * ops->size);
+
+	#define READVAR() do{                                              \
+			if (pc + 2 > ops->size)                                    \
+				goto fail;                                             \
+			A = ops->bytes[pc++];                                      \
+			B = ops->bytes[pc++];                                      \
+			if (A > level)                                             \
+				goto fail;                                             \
+		} while (false)
+
+	#define READLOC(L) do{                                             \
+			if (pc + 4 > ops->size)                                    \
+				goto fail;                                             \
+			A = ops->bytes[pc++];                                      \
+			B = ops->bytes[pc++];                                      \
+			C = ops->bytes[pc++];                                      \
+			D = ops->bytes[pc++];                                      \
+			jumploc = A + (B << 8) + (C << 16) + ((D << 23) * 2);      \
+			if (jumploc < 0)                                           \
+				goto fail;                                             \
+			if (jumploc < ops->size)                                   \
+				op_need[jumploc] = L;                                  \
+		} while (false)
+
+	#define READDATA(S) do{                                            \
+			if (pc + S > ops->size)                                    \
+				goto fail;                                             \
+			pc += S;                                                   \
+		} while (false)
+
+	#define READCNT() do{                                              \
+			if (pc + 1 > ops->size)                                    \
+				goto fail;                                             \
+			C = ops->bytes[pc++];                                      \
+			for (D = 0; D < C; D++)                                    \
+				READVAR();                                             \
+		} while (false)
+
+	#define READINDEX() do{                                            \
+			if (pc + 2 > ops->size)                                    \
+				goto fail;                                             \
+			A = ops->bytes[pc++];                                      \
+			B = ops->bytes[pc++];                                      \
+			A = A | (B << 8);                                          \
+		} while (false)
+
+	while (pc < ops->size){
+		op_actual[pc] = 1;
+		op_pcat opc = op_paramcat((op_enum)ops->bytes[pc++]);
+		debug(op_pcat_name(opc));
+		switch (opc){
+			case OPPC_INVALID    : goto fail;
+
+			case OPPC_STR        : { // [VAR], [INDEX]
+				READVAR();
+				READINDEX();
+				if (A < 0 || A >= prg->strTable->size)
+					goto fail;
+			} break;
+
+			case OPPC_CMDHEAD    : { // LEVEL, RESTPOS
+				if (!wasjump)
+					goto fail;
+				if (pc + 2 > ops->size)
+					goto fail;
+				op_actual[pc - 1] = 2; // valid call target
+				if (level > 255)
+					goto fail;
+				jumplocs[level++] = jumploc; // save previous jump target
+				A = ops->bytes[pc++];
+				B = ops->bytes[pc++];
+				if (A != level)
+					goto fail;
+			} break;
+
+			case OPPC_CMDTAIL    : { //
+				if (level <= 0)
+					goto fail;
+				if (jumplocs[--level] != pc) // force jump target to jump over command body
+					goto fail;
+			} break;
+
+			case OPPC_JUMP       : { // [[LOCATION]]
+				READLOC(1); // need valid jump target
+			} break;
+
+			case OPPC_VJUMP      : { // [VAR], [[LOCATION]]
+				READVAR();
+				READLOC(1); // need valid jump target
+			} break;
+
+			case OPPC_CALL       : { // [VAR], [[LOCATION]], ARGCOUNT, [VARS]...
+				READVAR();
+				READLOC(2); // need valid call target
+				READCNT();
+			} break;
+
+			case OPPC_NATIVE     : { // [VAR], [INDEX], ARGCOUNT, [VARS]...
+				READVAR();
+				READINDEX();
+				if (A < 0 || A >= prg->keyTable->size)
+					goto fail;
+				READCNT();
+			} break;
+
+			case OPPC_RETURNTAIL : { // [[LOCATION]], ARGCOUNT, [VARS]...
+				READLOC(2); // need valid call target
+				READCNT();
+			} break;
+
+			case OPPC_VVVV       :   // [VAR], [VAR], [VAR], [VAR]
+				READVAR();
+			case OPPC_VVV        :   // [VAR], [VAR], [VAR]
+				READVAR();
+			case OPPC_VV         :   // [VAR], [VAR]
+				READVAR();
+			case OPPC_V          :   // [VAR]
+				READVAR();
+			case OPPC_EMPTY      :   // nothing
+				break;
+
+			case OPPC_VA         : { // [VAR], ARGCOUNT, [VARS]...
+				READVAR();
+				READCNT();
+			} break;
+
+			case OPPC_VN         : { // [VAR], DATA
+				READVAR();
+				READDATA(1);
+			} break;
+
+			case OPPC_VNN        : { // [VAR], [DATA]
+				READVAR();
+				READDATA(2);
+			} break;
+
+			case OPPC_VNNNN      : { // [VAR], [[DATA]]
+				READVAR();
+				READDATA(4);
+			} break;
+
+			case OPPC_VNNNNNNNN  : { // [VAR], [[[DATA]]]
+				READVAR();
+				READDATA(8);
+			} break;
+		}
+		wasjump = opc == OPPC_JUMP;
+	}
+
+	#undef READVAR
+	#undef READLOC
+	#undef READDATA
+	#undef READCNT
+	#undef READINDEX
+
+	// validate op_need alignments matches op_actual alignments
+	for (int i = 0; i < ops->size; i++){
+		if (op_need[i] != 0 && op_need[i] != op_actual[i])
+			goto fail;
+	}
+
+	mem_free(op_actual);
+	mem_free(op_need);
+	return true;
+
+	fail:
+	mem_free(op_actual);
+	mem_free(op_need);
+	return false;
 }
 
 typedef struct {
@@ -6407,8 +6812,24 @@ static per_st program_evalCall(program prg, symtbl sym, pem_enum mode, varloc_st
 	bool oarg = true;
 	if (nsn->type == NSN_CMD_LOCAL)
 		label_call(nsn->u.cmdLocal.lbl, prg->ops, intoVlc, argcount);
-	else if (nsn->type == NSN_CMD_NATIVE)
-		op_native(prg->ops, intoVlc, nsn->u.index, argcount);
+	else if (nsn->type == NSN_CMD_NATIVE){
+		// search for the hash
+		int index;
+		bool found = false;
+		for (index = 0; index < prg->keyTable->size; index++){
+			if (prg->keyTable->vals[index] == nsn->u.hash){
+				found = true;
+				break;
+			}
+		}
+		if (!found){
+			if (prg->keyTable->size >= 65536) // using too many native calls?
+				return per_error(flp, sink_format("Too many native commands"));
+			index = prg->keyTable->size;
+			list_u64_push(prg->keyTable, nsn->u.hash);
+		}
+		op_native(prg->ops, intoVlc, index, argcount);
+	}
 	else{ // NSN_CMD_OPCODE
 		if (nsn->u.cmdOpcode.params < 0)
 			op_parama(prg->ops, nsn->u.cmdOpcode.opcode, intoVlc, argcount);
@@ -7257,6 +7678,7 @@ typedef struct {
 	varloc_st t2;
 	varloc_st t3;
 	varloc_st t4;
+	varloc_st val_vlc;
 	varloc_st idx_vlc;
 } pgs_for_st, *pgs_for;
 
@@ -7268,12 +7690,13 @@ static inline void pgs_for_free(pgs_for pst){
 }
 
 static inline pgs_for pgs_for_new(varloc_st t1, varloc_st t2, varloc_st t3, varloc_st t4,
-	varloc_st idx_vlc, label top, label inc, label finish){
+	varloc_st val_vlc, varloc_st idx_vlc, label top, label inc, label finish){
 	pgs_for pst = mem_alloc(sizeof(pgs_for_st));
 	pst->t1 = t1;
 	pst->t2 = t2;
 	pst->t3 = t3;
 	pst->t4 = t4;
+	pst->val_vlc = val_vlc;
 	pst->idx_vlc = idx_vlc;
 	pst->top = top;
 	pst->inc = inc;
@@ -7318,56 +7741,46 @@ static inline pgs_if pgs_if_new(label nextcond, label ifdone){
 	return pst;
 }
 
-static pgr_st program_forVars(symtbl sym, ast stmt){
-	varloc_st val_vlc;
-	varloc_st idx_vlc;
+typedef struct {
+	varloc_st vlc;
+	char *err;
+} pfvs_res_st;
 
-	// load VLC's for the value and index
-	if (stmt->u.for1.forVar){
-		sta_st sr = symtbl_addVar(sym, stmt->u.for1.names1, -1);
-		if (sr.type == STA_ERROR)
-			return pgr_error(stmt->flp, sr.u.msg);
-		val_vlc = sr.u.vlc;
-
-		if (stmt->u.for1.names2 == NULL){
-			sta_st ts = symtbl_addTemp(sym);
-			if (ts.type == STA_ERROR)
-				return pgr_error(stmt->flp, ts.u.msg);
-			idx_vlc = ts.u.vlc;
-		}
-		else{
-			sr = symtbl_addVar(sym, stmt->u.for1.names2, -1);
-			if (sr.type == STA_ERROR)
-				return pgr_error(stmt->flp, sr.u.msg);
-			idx_vlc = sr.u.vlc;
-		}
+static inline pfvs_res_st program_forVarsSingle(symtbl sym, bool forVar, list_ptr names){
+	if (names == NULL || forVar){
+		sta_st ts = names == NULL ? symtbl_addTemp(sym) : symtbl_addVar(sym, names, -1);
+		if (ts.type == STA_ERROR)
+			return (pfvs_res_st){ .vlc = VARLOC_NULL, .err = ts.u.msg };
+		return (pfvs_res_st){ .vlc = ts.u.vlc, .err = NULL };
 	}
 	else{
-		stl_st sl = symtbl_lookup(sym, stmt->u.for1.names1);
+		stl_st sl = symtbl_lookup(sym, names);
 		if (sl.type == STL_ERROR)
-			return pgr_error(stmt->flp, sl.u.msg);
-		if (sl.u.nsn->type != NSN_VAR)
-			return pgr_error(stmt->flp, sink_format("Cannot use non-variable in for loop"));
-		val_vlc = varloc_new(sl.u.nsn->u.var.fr->level, sl.u.nsn->u.var.index);
-
-		if (stmt->u.for1.names2 == NULL){
-			sta_st ts = symtbl_addTemp(sym);
-			if (ts.type == STA_ERROR)
-				return pgr_error(stmt->flp, ts.u.msg);
-			idx_vlc = ts.u.vlc;
+			return (pfvs_res_st){ .vlc = VARLOC_NULL, .err = sl.u.msg };
+		if (sl.u.nsn->type != NSN_VAR){
+			return (pfvs_res_st){
+				.vlc = VARLOC_NULL,
+				.err = sink_format("Cannot use non-variable in for loop")
+			};
 		}
-		else{
-			sl = symtbl_lookup(sym, stmt->u.for1.names2);
-			if (sl.type == STL_ERROR)
-				return pgr_error(stmt->flp, sl.u.msg);
-			if (sl.u.nsn->type != NSN_VAR){
-				return pgr_error(stmt->flp,
-					sink_format("Cannot use non-variable in for loop"));
-			}
-			idx_vlc = varloc_new(sl.u.nsn->u.var.fr->level, sl.u.nsn->u.var.index);
-		}
+		return (pfvs_res_st){
+			.vlc = varloc_new(sl.u.nsn->u.var.fr->level, sl.u.nsn->u.var.index),
+			.err = NULL
+		};
 	}
-	return pgr_forvars(val_vlc, idx_vlc);
+}
+
+static pgr_st program_forVars(symtbl sym, ast stmt){
+	pfvs_res_st pf1 = { .vlc = VARLOC_NULL };
+	if (stmt->u.for1.names1 != NULL){
+		pf1 = program_forVarsSingle(sym, stmt->u.for1.forVar, stmt->u.for1.names1);
+		if (pf1.err)
+			return pgr_error(stmt->flp, pf1.err);
+	}
+	pfvs_res_st pf2 = program_forVarsSingle(sym, stmt->u.for1.forVar, stmt->u.for1.names2);
+	if (pf2.err)
+		return pgr_error(stmt->flp, pf2.err);
+	return pgr_forvars(pf1.vlc, pf2.vlc);
 }
 
 static pgr_st program_genForRange(program prg, symtbl sym, ast stmt, varloc_st p1, varloc_st p2,
@@ -7417,22 +7830,25 @@ static pgr_st program_genForRange(program prg, symtbl sym, ast stmt, varloc_st p
 	op_binop(prg->ops, OP_LT, t, idx_vlc, p2);
 	label_jumpfalse(finish, prg->ops, t);
 
-	if (varloc_isnull(p3)){
-		if (!zerostart)
-			op_binop(prg->ops, OP_NUM_ADD, val_vlc, p1, idx_vlc);
-		else
-			op_move(prg->ops, val_vlc, idx_vlc);
-	}
-	else{
-		op_binop(prg->ops, OP_NUM_MUL, val_vlc, idx_vlc, p3);
-		if (!zerostart)
-			op_binop(prg->ops, OP_NUM_ADD, val_vlc, p1, val_vlc);
+	if (!varloc_isnull(val_vlc)){
+		if (varloc_isnull(p3)){
+			if (!zerostart)
+				op_binop(prg->ops, OP_NUM_ADD, val_vlc, p1, idx_vlc);
+			else
+				op_move(prg->ops, val_vlc, idx_vlc);
+		}
+		else{
+			op_binop(prg->ops, OP_NUM_MUL, val_vlc, idx_vlc, p3);
+			if (!zerostart)
+				op_binop(prg->ops, OP_NUM_ADD, val_vlc, p1, val_vlc);
+		}
 	}
 
 	sym->sc->lblBreak = finish;
 	sym->sc->lblContinue = inc;
 
-	return pgr_push(pgs_for_new(p1, p2, p3, t, idx_vlc, top, inc, finish), (free_func)pgs_for_free);
+	return pgr_push(pgs_for_new(p1, p2, p3, t, val_vlc, idx_vlc, top, inc, finish),
+		(free_func)pgs_for_free);
 }
 
 static pgr_st program_genForGeneric(program prg, symtbl sym, ast stmt){
@@ -7472,11 +7888,13 @@ static pgr_st program_genForGeneric(program prg, symtbl sym, ast stmt){
 	op_binop(prg->ops, OP_LT, t, idx_vlc, t);
 	label_jumpfalse(finish, prg->ops, t);
 
-	op_getat(prg->ops, val_vlc, exp_vlc, idx_vlc);
+	if (!varloc_isnull(val_vlc))
+		op_getat(prg->ops, val_vlc, exp_vlc, idx_vlc);
 	sym->sc->lblBreak = finish;
 	sym->sc->lblContinue = inc;
 
-	return pgr_push(pgs_for_new(t, exp_vlc, val_vlc, VARLOC_NULL, idx_vlc, top, inc, finish),
+	return pgr_push(
+		pgs_for_new(t, exp_vlc, VARLOC_NULL, VARLOC_NULL, val_vlc, idx_vlc, top, inc, finish),
 		(free_func)pgs_for_free);
 }
 
@@ -7508,20 +7926,8 @@ static inline pgr_st program_gen(program prg, symtbl sym, ast stmt, void *state,
 						return pgr_error(stmt->flp, sr.u.msg);
 				} break;
 				case DECL_NATIVE: {
-					bool found = false;
-					uint64_t hash = native_hash(dc->key->size, dc->key->bytes);
-					int index;
-					for (index = 0; index < prg->keyTable->size; index++){
-						found = prg->keyTable->vals[index] == hash;
-						if (found)
-							break;
-					}
-					if (!found){
-						if (index >= 65536)
-							return pgr_error(stmt->flp, sink_format("Too many native functions"));
-						list_u64_push(prg->keyTable, hash);
-					}
-					sta_st sr = symtbl_addCmdNative(sym, dc->names, index);
+					sta_st sr = symtbl_addCmdNative(sym, dc->names,
+						native_hash(dc->key->size, dc->key->bytes));
 					if (sr.type == STA_ERROR)
 						return pgr_error(stmt->flp, sr.u.msg);
 				} break;
@@ -7716,7 +8122,11 @@ static inline pgr_st program_gen(program prg, symtbl sym, ast stmt, void *state,
 				expr c = stmt->u.for1.ex;
 				if (c->u.call.cmd->type == EXPR_NAMES){
 					expr n = c->u.call.cmd;
-					if (n->u.names->size == 1 && byteequ(n->u.names->ptrs[0], "range")){
+					stl_st sl = symtbl_lookup(sym, n->u.names);
+					if (sl.type == STL_ERROR)
+						return pgr_error(stmt->flp, sl.u.msg);
+					nsname nsn = sl.u.nsn;
+					if (nsn->type == NSN_CMD_OPCODE && nsn->u.cmdOpcode.opcode == OP_RANGE){
 						expr p = c->u.call.params;
 						varloc_st rp[3] = { VARLOC_NULL, VARLOC_NULL, VARLOC_NULL };
 						if (p->type != EXPR_GROUP){
@@ -7765,6 +8175,8 @@ static inline pgr_st program_gen(program prg, symtbl sym, ast stmt, void *state,
 				symtbl_clearTemp(sym, pst->t3);
 			if (!varloc_isnull(pst->t4))
 				symtbl_clearTemp(sym, pst->t4);
+			if (!varloc_isnull(pst->val_vlc))
+				symtbl_clearTemp(sym, pst->val_vlc);
 			symtbl_clearTemp(sym, pst->idx_vlc);
 			symtbl_popScope(sym);
 			return pgr_pop();
@@ -10032,6 +10444,48 @@ static inline sink_val opi_triop(context ctx, sink_val a, sink_val b, sink_val c
 	return oper_tri(ctx, a, b, c, f_trinary);
 }
 
+static inline sink_val opi_combop(context ctx, int size, sink_val *vals, binary_func f_binary,
+	const char *erop){
+	if (size <= 0)
+		goto badtype;
+	int listsize = -1;
+	for (int i = 0; i < size; i++){
+		if (sink_islist(vals[i])){
+			sink_list ls = var_castlist(ctx, vals[i]);
+			if (ls->size > listsize)
+				listsize = ls->size;
+			for (int j = 0; j < size; j++){
+				if (!sink_isnum(ls->vals[j]))
+					goto badtype;
+			}
+		}
+		else if (!sink_isnum(vals[i]))
+			goto badtype;
+	}
+
+	if (listsize < 0){
+		// no lists, so just combine
+		for (int i = 1; i < size; i++)
+			vals[0] = f_binary(ctx, vals[0], vals[i]);
+		return vals[0];
+	}
+	else if (listsize > 0){
+		sink_val *ret = mem_alloc(sizeof(sink_val) * listsize);
+		for (int j = 0; j < listsize; j++)
+			ret[j] = arget(ctx, vals[0], j);
+		for (int i = 1; i < size; i++){
+			for (int j = 0; j < listsize; j++)
+				ret[j] = f_binary(ctx, ret[j], arget(ctx, vals[i], j));
+		}
+		return sink_list_newblobgive(ctx, listsize, listsize, ret);
+	}
+	// otherwise, listsize == 0
+	return sink_list_newblob(ctx, 0, NULL);
+
+	badtype:
+	return opi_abortformat(ctx, "Expecting number or list of numbers when %s", erop);
+}
+
 static inline sink_val opi_str_at(context ctx, sink_val a, sink_val b){
 	sink_str s = var_caststr(ctx, a);
 	int idx = b.f;
@@ -11538,6 +11992,12 @@ static inline uint8_t *opi_list_joinplain(sink_ctx ctx, int size, sink_val *vals
 	const uint8_t *sep, int *totv);
 
 static sink_run context_run(context ctx){
+	#ifdef SINK_DEBUG
+	if (!program_validate(ctx->prg)){
+		debug("Program failed to validate");
+		return SINK_RUN_FAIL;
+	}
+	#endif
 	if (ctx->passed) return SINK_RUN_PASS;
 	if (ctx->failed) return SINK_RUN_FAIL;
 	if (ctx->async ) return SINK_RUN_ASYNC;
@@ -11680,7 +12140,7 @@ static sink_run context_run(context ctx){
 				));
 			} break;
 
-			case OP_NUMDBL         : { // [TGT], [[[[VALUE]]]]
+			case OP_NUMDBL         : { // [TGT], [[[VALUE]]]
 				LOAD_abcdefghij();
 				X.u = ((uint64_t)C) |
 					(((uint64_t)D) << 8) |
@@ -12300,16 +12760,40 @@ static sink_run context_run(context ctx){
 				INLINE_UNOP(unop_int_not, "NOTing")
 			} break;
 
-			case OP_INT_AND        : { // [TGT], [SRC1], [SRC2]
-				INLINE_BINOP(binop_int_and, "ANDing")
+			case OP_INT_AND        : { // [TGT], ARGCOUNT, [ARGS]...
+				LOAD_abc();
+				for (D = 0; D < C; D++){
+					E = ops->bytes[ctx->pc++]; F = ops->bytes[ctx->pc++];
+					p[D] = var_get(ctx, E, F);
+				}
+				X = opi_combop(ctx, C, p, binop_int_and, "ANDing");
+				if (ctx->failed)
+					return SINK_RUN_FAIL;
+				var_set(ctx, A, B, X);
 			} break;
 
-			case OP_INT_OR         : { // [TGT], [SRC1], [SRC2]
-				INLINE_BINOP(binop_int_or, "ORing")
+			case OP_INT_OR         : { // [TGT], ARGCOUNT, [ARGS]...
+				LOAD_abc();
+				for (D = 0; D < C; D++){
+					E = ops->bytes[ctx->pc++]; F = ops->bytes[ctx->pc++];
+					p[D] = var_get(ctx, E, F);
+				}
+				X = opi_combop(ctx, C, p, binop_int_or, "ORing");
+				if (ctx->failed)
+					return SINK_RUN_FAIL;
+				var_set(ctx, A, B, X);
 			} break;
 
-			case OP_INT_XOR        : { // [TGT], [SRC1], [SRC2]
-				INLINE_BINOP(binop_int_xor, "XORing")
+			case OP_INT_XOR        : { // [TGT], ARGCOUNT, [ARGS]...
+				LOAD_abc();
+				for (D = 0; D < C; D++){
+					E = ops->bytes[ctx->pc++]; F = ops->bytes[ctx->pc++];
+					p[D] = var_get(ctx, E, F);
+				}
+				X = opi_combop(ctx, C, p, binop_int_xor, "XORing");
+				if (ctx->failed)
+					return SINK_RUN_FAIL;
+				var_set(ctx, A, B, X);
 			} break;
 
 			case OP_INT_SHL        : { // [TGT], [SRC1], [SRC2]
@@ -13055,24 +13539,34 @@ static void flpn_free(filepos_node flpn){
 
 typedef struct {
 	list_ptr name;
-	list_ptr body;
+	list_byte type; // 0 = body, 1 = file
+	list_ptr content;
 } staticinc_st, *staticinc;
 
 static inline staticinc staticinc_new(){
 	staticinc sinc = mem_alloc(sizeof(staticinc_st));
 	sinc->name = list_ptr_new(NULL);
-	sinc->body = list_ptr_new(NULL);
+	sinc->type = list_byte_new();
+	sinc->content = list_ptr_new(NULL);
 	return sinc;
 }
 
-static inline void staticinc_add(staticinc sinc, const char *name, const char *body){
+static inline void staticinc_addbody(staticinc sinc, const char *name, const char *body){
 	list_ptr_push(sinc->name, (void *)name);
-	list_ptr_push(sinc->body, (void *)body);
+	list_byte_push(sinc->type, 0);
+	list_ptr_push(sinc->content, (void *)body);
+}
+
+static inline void staticinc_addfile(staticinc sinc, const char *name, const char *file){
+	list_ptr_push(sinc->name, (void *)name);
+	list_byte_push(sinc->type, 1);
+	list_ptr_push(sinc->content, (void *)file);
 }
 
 static inline void staticinc_free(staticinc sinc){
 	list_ptr_free(sinc->name);
-	list_ptr_free(sinc->body);
+	list_byte_free(sinc->type);
+	list_ptr_free(sinc->content);
 	mem_free(sinc);
 }
 
@@ -13245,10 +13739,21 @@ static char *compiler_process(compiler cmp){
 					bool internal = false;
 					for (int i = 0; i < cmp->sinc->name->size; i++){
 						const char *sinc_name = cmp->sinc->name->ptrs[i];
-						const char *sinc_body = cmp->sinc->body->ptrs[i];
 						if (strcmp(file, sinc_name) == 0){
 							internal = true;
-							bool success = compiler_staticinc(cmp, inc->names, file, sinc_body);
+							const char *sinc_content = cmp->sinc->content->ptrs[i];
+							bool is_body = cmp->sinc->type->bytes[i] == 0;
+							bool success;
+							if (is_body)
+								success = compiler_staticinc(cmp, inc->names, file, sinc_content);
+							else{
+								success = compiler_dynamicinc(cmp, inc->names, sinc_content,
+									stmt->flp.file);
+								if (!success){
+									compiler_setmsg(cmp,
+										sink_format("Failed to include: %s", file));
+								}
+							}
 							if (!success){
 								ast_free(stmt);
 								list_ptr_free(stmts);
@@ -13427,8 +13932,30 @@ void sink_scr_addpath(sink_scr scr, const char *path){
 	list_ptr_push(((script)scr)->paths, sink_format("%s", path));
 }
 
-void sink_scr_inc(sink_scr scr, const char *name, const char *body){
-	staticinc_add(((script)scr)->sinc, name, body);
+void sink_scr_incbody(sink_scr scr, const char *name, const char *body){
+	staticinc_addbody(((script)scr)->sinc, name, body);
+}
+
+void sink_scr_incfile(sink_scr scr, const char *name, const char *file){
+	staticinc_addfile(((script)scr)->sinc, name, file);
+}
+
+int sink_scr_getinctype(sink_scr scr, const char *name){
+	staticinc si = ((script)scr)->sinc;
+	for (int i = 0; i < si->name->size; i++){
+		if (strcmp(name, si->name->ptrs[i]) == 0)
+			return si->type->bytes[i];
+	}
+	return -1;
+}
+
+const char *sink_scr_getinccontent(sink_scr scr, const char *name){
+	staticinc si = ((script)scr)->sinc;
+	for (int i = 0; i < si->name->size; i++){
+		if (strcmp(name, si->name->ptrs[i]) == 0)
+			return si->content->ptrs[i];
+	}
+	return NULL;
 }
 
 void sink_scr_cleanup(sink_scr scr, void *cuser, sink_free_func f_free){
@@ -13544,9 +14071,150 @@ int sink_scr_level(sink_scr scr){
 	return ((script)scr)->cmp->pr->level;
 }
 
-void sink_scr_dump(sink_scr scr, void *user, sink_dump_func f_dump){
-	fprintf(stderr, "TODO: write sc->prg to f_dump\n");
-	abort();
+void sink_scr_dump(sink_scr scr, bool debug, void *user, sink_dump_func f_dump){
+	// all integer values are little endian
+
+	// output header
+	// 4 bytes: header: 0xFC, 'S', 'k', file format version (always 0x01)
+	// 2 bytes: string table size
+	// 2 bytes: key table size
+	// 4 bytes: unique filename table size
+	// 4 bytes: flp table size
+	uint8_t header[16] = { 0xFC, 0x53, 0x6B, 0x01, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+	list_int flpmap = NULL;
+	program prg = ((script)scr)->prg;
+	header[4] = (prg->strTable->size     ) & 0xFF;
+	header[5] = (prg->strTable->size >> 8) & 0xFF;
+	header[6] = (prg->keyTable->size     ) & 0xFF;
+	header[7] = (prg->keyTable->size >> 8) & 0xFF;
+	if (debug){
+		// calculate unique filenames
+		flpmap = list_int_new();
+		for (int i = 0; i < prg->flpTable->size; i++){
+			prgflp p = prg->flpTable->ptrs[i];
+			bool found = false;
+			int j;
+			for (j = 0; j < flpmap->size && !found; j++){
+				prgflp p2 = prg->flpTable->ptrs[j];
+				found = strcmp(p->flp.file, p2->flp.file) == 0;
+			}
+			if (!found)
+				list_int_push(flpmap, i); // maps i'th flpTable entry to the j'th unique file
+		}
+		header[ 8] = (flpmap->size      ) & 0xFF;
+		header[ 9] = (flpmap->size >>  8) & 0xFF;
+		header[10] = (flpmap->size >> 16) & 0xFF;
+		header[11] = (flpmap->size >> 24) & 0xFF;
+		header[12] = (prg->flpTable->size      ) & 0xFF;
+		header[13] = (prg->flpTable->size >>  8) & 0xFF;
+		header[14] = (prg->flpTable->size >> 16) & 0xFF;
+		header[15] = (prg->flpTable->size >> 24) & 0xFF;
+	}
+	f_dump(header, 1, 16, user);
+
+	// output strTable
+	// 4 bytes: string size
+	// N bytes: raw string bytes
+	for (int i = 0; i < prg->strTable->size; i++){
+		list_byte str = prg->strTable->ptrs[i];
+		uint8_t sizeb[4] = {
+			(str->size      ) & 0xFF,
+			(str->size >>  8) & 0xFF,
+			(str->size >> 16) & 0xFF,
+			(str->size >> 24) & 0xFF
+		};
+		f_dump(sizeb, 1, 4, user);
+		if (str->size > 0)
+			f_dump(str->bytes, 1, str->size, user);
+	}
+
+	// output keyTable
+	// 8 bytes: hash identifier
+	for (int i = 0; i < prg->keyTable->size; i++){
+		uint64_t id = prg->keyTable->vals[i];
+		uint8_t idb[8] = {
+			(id      ) & 0xFF,
+			(id >>  8) & 0xFF,
+			(id >> 16) & 0xFF,
+			(id >> 24) & 0xFF,
+			(id >> 32) & 0xFF,
+			(id >> 40) & 0xFF,
+			(id >> 48) & 0xFF,
+			(id >> 56) & 0xFF
+		};
+		f_dump(idb, 1, 8, user);
+	}
+
+	if (debug){
+		// output unique filenames
+		// 4 bytes: filename length
+		// N bytes: filename raw bytes
+		for (int i = 0; i < flpmap->size; i++){
+			prgflp p = prg->flpTable->ptrs[flpmap->vals[i]];
+			size_t flen = p->flp.file == NULL ? 4 : strlen(p->flp.file);
+			uint8_t flenb[4] = {
+				(flen      ) & 0xFF,
+				(flen >>  8) & 0xFF,
+				(flen >> 16) & 0xFF,
+				(flen >> 24) & 0xFF
+			};
+			f_dump(flenb, 1, 4, user);
+			if (p->flp.file == NULL)
+				f_dump("eval", 1, 4, user);
+			else if (flen > 0)
+				f_dump(p->flp.file, 1, flen, user);
+		}
+
+		// output flpTable
+		// 4 bytes: start PC
+		// 4 bytes: line number
+		// 4 bytes: character number
+		// 4 bytes: filename index
+		for (int i = 0; i < prg->flpTable->size; i++){
+			prgflp p = prg->flpTable->ptrs[i];
+			// find unique filename entry
+			int j;
+			for (j = 0; j < flpmap->size; j++){
+				prgflp p2 = prg->flpTable->ptrs[flpmap->vals[j]];
+				if (p->flp.file == p2->flp.file ||
+					(p->flp.file != NULL && p2->flp.file != NULL &&
+						strcmp(p->flp.file, p2->flp.file) == 0))
+					break;
+			}
+			uint8_t plcb[16] = {
+				(p->pc            ) & 0xFF,
+				(p->pc       >>  8) & 0xFF,
+				(p->pc       >> 16) & 0xFF,
+				(p->pc       >> 24) & 0xFF,
+				(p->flp.line      ) & 0xFF,
+				(p->flp.line >>  8) & 0xFF,
+				(p->flp.line >> 16) & 0xFF,
+				(p->flp.line >> 24) & 0xFF,
+				(p->flp.chr       ) & 0xFF,
+				(p->flp.chr  >>  8) & 0xFF,
+				(p->flp.chr  >> 16) & 0xFF,
+				(p->flp.chr  >> 24) & 0xFF,
+				(j                ) & 0xFF,
+				(j           >>  8) & 0xFF,
+				(j           >> 16) & 0xFF,
+				(j           >> 24) & 0xFF
+			};
+			f_dump(plcb, 1, 16, user);
+		}
+	}
+
+	// output ops
+	// just the raw bytecode
+	if (prg->ops->size > 0)
+		f_dump(prg->ops->bytes, 1, prg->ops->size, user);
+
+	// output end
+	// single 0xFD byte which is an invalid op
+	uint8_t end = 0xFD;
+	f_dump(&end, 1, 1, user);
+
+	if (flpmap)
+		list_int_free(flpmap);
 }
 
 void sink_scr_free(sink_scr scr){
