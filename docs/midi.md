@@ -227,15 +227,103 @@ type.  For example, `94` is a Note On message for channel 5.
 
 ```
 (Control Change Status) BnH
-00-77 bunch of stuff
+
+Controllers 00-1F (MSB 00-1F, optional LSB 20-3F):
+00 Bank Select (LSB is required, followed immedialy by Patch/Program Change message)
+01 Modulation wheel or lever
+02 Breath controller
+03 Undefined
+04 Foot controller
+05 Portamento time
+06 Data Entry
+07 Channel Volume
+08 Balance (00 = left, 40 = equal, 7F = right)
+09 Undefined
+0A Pan (00 = left, 40 = equal, 7F = right)
+0B Expression
+0C Effect Control 1
+0D Effect Control 2
+0E Undefined
+0F Undefined
+10 General Purpose 1
+11 General Purpose 2
+12 General Purpose 3
+13 General Purpose 4
+14 Undefined
+15 Undefined
+16 Undefined
+17 Undefined
+18 Undefined
+19 Undefined
+1A Undefined
+1B Undefined
+1C Undefined
+1D Undefined
+1E Undefined
+1F Undefined
+20-3F LSB of controllers 00-1F
+40 Damper/sustain pedal
+41 Portamento on/off
+42 Sostenuto
+43 Soft pedal
+44 Legato Footswitch (00-3F = normal, 40-7F = legato)
+45 Hold 2
+46 Sound Controller 1 (Sound Variation)
+47 Sound Controller 2 (Timber/Harmonic Intensity)
+48 Sound Controller 3 (Release Time)
+49 Sound Controller 4 (Attack Time)
+4A Sound Controller 5 (Brightness)
+4B Sound Controller 6 (Decay Time)
+4C Sound Controller 7 (Vibrato Rate)
+4D Sound Controller 8 (Vibrato Depth)
+4E Sound Controller 9 (Vibrato Delay)
+4F Sound Controller 10
+50 General Purpose 5
+51 General Purpose 6
+52 General Purpose 7
+53 General Purpose 8
+54 Portamento control
+55 Undefined
+56 Undefined
+57 Undefined
+58 Undefined
+59 Undefined
+5A Undefined
+5B Effect 1 Depth (External)
+5C Effect 2 Depth (Tremolo)
+5D Effect 3 Depth (Chorus)
+5E Effect 4 Depth (Celeste Detune)
+5F Effect 5 Depth (Phaser)
+60 Data Increment
+61 Data Decrement
+62 Non-Registered Parameter Number (NRPM) LSB
+63 Non-Registered Parameter Number (NRPM) MSB
+64 Registered Parameter Number (RPM) LSB
+65 Registered Parameter Number (RPM) MSB
+
+N/RPM sequence:
+1. Select the N/RPM to edit using messages 62+63 or 64+65
+2. Adjust the value using controller 06 (set the value), or 60/61 to increment/decrement
+
+66-77 Undefined single byte controllers
+
 78 00 All Sound Off
 79 00 Reset All Controllers
-7A 00 off, 7F on Local Control
+7A XX Local Control (00 off, 7F on)
 7B 00 All Notes Off
 7C 00 Omni Off
 7D 00 Omni On
 7E MM (number of channels, 00 for all) Mono On (Poly Off)
 7F 00 Poly On (Mono Off)
+
+RPNs:
+
+0000 Pitch Bend Sensitivity (MSB = semitones, LSB = cents)
+0001 Fine Tuning
+0002 Coarse Tuning
+0003 Tuning Program Select
+0004 Tuning Bank Select
+0005 Modulation Depth Range
 ```
 
 #### Running Status

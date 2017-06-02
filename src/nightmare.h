@@ -82,7 +82,7 @@ void        nm_defpatch(nm_patch patch, uint8_t wave, float peak, float attack, 
 	float sustain, float harmonic1, float harmonic2, float harmonic3, float harmonic4);
 bool        nm_ctx_bake(nm_ctx ctx, uint32_t ticks);
 bool        nm_ctx_bakeall(nm_ctx ctx);
-void        nm_ctx_savemidi(nm_ctx ctx, nm_fwrite_func f_fwrite, void *user);
+void        nm_ctx_savemidi(nm_ctx ctx, void *user, nm_fwrite_func f_fwrite);
 void        nm_ctx_clear(nm_ctx ctx);
 void        nm_ctx_process(nm_ctx ctx, int sample_len, nm_sample samples);
 void        nm_ctx_dumpev(nm_ctx ctx);

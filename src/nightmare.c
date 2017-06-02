@@ -987,8 +987,8 @@ bool nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_
 									ti_dirty = true;
 									ti_ticks = ticks;
 									int den = 1 << data[p + 1];
-									// given a ti_tempo and ti_tsden, reverse calculate the MIDI tempo
-									// (reverse of formula above `ti_tempo = ...`)
+									// given a ti_tempo and ti_tsden, reverse calculate the MIDI
+									// tempo (reverse of formula above `ti_tempo = ...`)
 									int tempo = ((float)ti_tsden * 15000000.0f) / ti_tempo;
 									ti_tsnum = data[p];
 									ti_tsden = den;
@@ -1357,7 +1357,7 @@ bool nm_ctx_bakeall(nm_ctx ctx){
 	return nm_ctx_bake(ctx, ctx->last_wevent->ev.tick);
 }
 
-void nm_ctx_savemidi(nm_ctx ctx, nm_fwrite_func f_fwrite, void *user){
+void nm_ctx_savemidi(nm_ctx ctx, void *user, nm_fwrite_func f_fwrite){
 	const int division = 480;
 	const uint8_t header[] = { 'M', 'T', 'h', 'd', 0, 0, 0, 6, 0, 0, 0, 1,
 		division >> 8, division & 0xFF };
