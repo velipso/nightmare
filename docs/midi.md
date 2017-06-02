@@ -84,16 +84,6 @@ The largest Data Size I've seen is 362,528 bytes (`dou_01.mid`), which is 45 min
 A good sanity check might be to make sure the Data Size isn't larger than, say, 1,000,000 bytes,
 otherwise you're probably reading bad data.
 
-### Chunk Statistics
-
-The real-world data contains:
-
-* 48,197 MIDI files, all of them starting with an `'MThd'` chunk
-* 539,469 total recognizable chunks inside those files
-    * 124 of all chunks were misaligned and found by searching near where a chunk should start
-    * 19 of all chunks were `'MThd'` chunks in the middle of a file
-* 1,767 files had garbage data at the end that couldn't be recognized as a chunk
-
 Header Chunk `'MThd'`
 ---------------------
 
@@ -140,23 +130,6 @@ look into it.  Otherwise, I will just reject files that have bit 15 set.
 
 Figuring out the timing of the events is, unfortunately, not straight forward.  There is an entire
 section on calculating timing below.
-
-### `'MThd'` Statistics
-
-* One file (`candyluv.mid`) has a header with Data Size set to 10 (`00 00 00 0A`)
-* Distribution of Formats:
-    * Format 0: 13.5% (6529 of 48216)
-    * Format 1: 86.4% (41662 of 48216)
-    * Format 2: 0.05% (23 of 48216)
-    * Bad Format: 0.004% (2 of 48216, `boythorn.mid` has `74 01` and `possible.mid` has `70 01`)
-* 0.74% of files have an incorrect Track Chunks count (359 of 48197)
-* Division values range from 2 to 25000, with the most common values being:
-    * 120: 28.9% (13948 of 48213)
-    * 480: 16.2% (7809 of 48213)
-    * 192: 16.1% (7746 of 48213)
-    * 384: 15.2% (7316 of 48213)
-    * 240: 10.2% (4939 of 48213)
-    * 96: 9.9% (4770 of 48213)
 
 Track Chunk `'MTrk'`
 --------------------
@@ -566,8 +539,6 @@ second) to figure out the *samples per tick*: Sample Rate /
 One last note: there needs to be care taken when calculating timing because a MIDI file can change
 the tempo or time signature during the middle of the song, which will change how ticks map to
 samples.
-
-TODO: analyze how many midi files don't have tempo, or have timesig before tempo affecting timing
 
 Appendix: SysEx Manufacturer ID Numbers
 ========================================
