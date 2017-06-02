@@ -171,10 +171,10 @@ Track chunks consist of a stream of timestamped events.
 
 A single MTrk event consists of a delta timestamp and an event:
 
-| Name            | Size         | Description                                                    |
-|-----------------|--------------|----------------------------------------------------------------|
-| Delta Timestamp | Variable Int | Number of ticks this event occurs relative to previous event   |
-| Event           | Varies according to event | Channel Message, SysEx Event, or Meta Event       |
+| Name                 | Size         | Description                                               |
+|----------------------|--------------|-----------------------------------------------------------|
+| Delta Timestamp (DT) | Variable Int |Number of ticks this event occurs relative to previous event|
+| Event                | Varies according to event | Channel Message, SysEx Event, or Meta Event  |
 
 ### Variable Int Quantities
 
@@ -225,107 +225,6 @@ type.  For example, `94` is a Note On message for channel 5.
 | `Dn`    | Pressure (`00` to `7F`) | N/A                             | Channel Pressure          |
 | `En`    | Bend Change LSB (`00` to `7F`) | Bend Change MSB (`00` to `7F`) | Pitch Bend          |
 
-```
-(Control Change Status) BnH
-
-Controllers 00-1F (MSB 00-1F, optional LSB 20-3F):
-00 Bank Select (LSB is required, followed immedialy by Patch/Program Change message)
-01 Modulation wheel or lever
-02 Breath controller
-03 Undefined
-04 Foot controller
-05 Portamento time
-06 Data Entry
-07 Channel Volume
-08 Balance (00 = left, 40 = equal, 7F = right)
-09 Undefined
-0A Pan (00 = left, 40 = equal, 7F = right)
-0B Expression
-0C Effect Control 1
-0D Effect Control 2
-0E Undefined
-0F Undefined
-10 General Purpose 1
-11 General Purpose 2
-12 General Purpose 3
-13 General Purpose 4
-14 Undefined
-15 Undefined
-16 Undefined
-17 Undefined
-18 Undefined
-19 Undefined
-1A Undefined
-1B Undefined
-1C Undefined
-1D Undefined
-1E Undefined
-1F Undefined
-20-3F LSB of controllers 00-1F
-40 Damper/sustain pedal
-41 Portamento on/off
-42 Sostenuto
-43 Soft pedal
-44 Legato Footswitch (00-3F = normal, 40-7F = legato)
-45 Hold 2
-46 Sound Controller 1 (Sound Variation)
-47 Sound Controller 2 (Timber/Harmonic Intensity)
-48 Sound Controller 3 (Release Time)
-49 Sound Controller 4 (Attack Time)
-4A Sound Controller 5 (Brightness)
-4B Sound Controller 6 (Decay Time)
-4C Sound Controller 7 (Vibrato Rate)
-4D Sound Controller 8 (Vibrato Depth)
-4E Sound Controller 9 (Vibrato Delay)
-4F Sound Controller 10
-50 General Purpose 5
-51 General Purpose 6
-52 General Purpose 7
-53 General Purpose 8
-54 Portamento control
-55 Undefined
-56 Undefined
-57 Undefined
-58 Undefined
-59 Undefined
-5A Undefined
-5B Effect 1 Depth (External)
-5C Effect 2 Depth (Tremolo)
-5D Effect 3 Depth (Chorus)
-5E Effect 4 Depth (Celeste Detune)
-5F Effect 5 Depth (Phaser)
-60 Data Increment
-61 Data Decrement
-62 Non-Registered Parameter Number (NRPM) LSB
-63 Non-Registered Parameter Number (NRPM) MSB
-64 Registered Parameter Number (RPM) LSB
-65 Registered Parameter Number (RPM) MSB
-
-N/RPM sequence:
-1. Select the N/RPM to edit using messages 62+63 or 64+65
-2. Adjust the value using controller 06 (set the value), or 60/61 to increment/decrement
-
-66-77 Undefined single byte controllers
-
-78 00 All Sound Off
-79 00 Reset All Controllers
-7A XX Local Control (00 off, 7F on)
-7B 00 All Notes Off
-7C 00 Omni Off
-7D 00 Omni On
-7E MM (number of channels, 00 for all) Mono On (Poly Off)
-7F 00 Poly On (Mono Off)
-
-RPNs:
-
-0000 Pitch Bend Sensitivity (MSB = semitones, LSB = cents)
-0001 Fine Tuning
-0002 Coarse Tuning
-0003 Tuning Program Select
-0004 Tuning Bank Select
-0005 Modulation Depth Range
-```
-
 #### Running Status
 
 TODO: running status only applies to Channel Messages
@@ -351,6 +250,215 @@ Default tuning will be: Frequency = 440 &times; 2<sup>(Note - 69) / 12</sup>
 |   7    | `60` | `61` | `62` | `63` | `64` | `65` | `66` | `67` | `68` | `69` | `6A` | `6B` |
 |   8    | `6C` | `6D` | `6E` | `6F` | `70` | `71` | `72` | `73` | `74` | `75` | `76` | `77` |
 |   9    | `78` | `79` | `7A` | `7B` | `7C` | `7D` | `7E` | `7F` | N/A  | N/A  | N/A  | N/A  |
+
+### Control Change Message `Bn`
+
+Different functions have been crammed into Control Change messages, so they are a bit messy to deal
+with.  Some of these functions require more data than what fits in a single Control Change message,
+so they span multiple Control Change messages.
+
+Generally speaking, there are four different functions:
+
+1. Low-resolution Controller (1 message)
+2. High-resolution Controller (spans 1 or 2 messages)
+3. Registered/Non-Registered Parameter (spans 3+ messages)
+4. Channel Mode (1 message)
+
+#### Low-resolution Controller
+
+```
+<DT> Bn NN VV
+```
+
+Low-resolution Controllers are the most simple.  The `NN` value ranges from `40` to `5F`, and the
+7 bit value inside `VV` is the new value for that controller.  For boolean controllers, values
+`00`-`3F` are considered "off", and `40`-`7F` are considered "on".  If transmitting, use `00` for
+off and `7F` for on.
+
+| `NN` | Control                                        |
+|------|------------------------------------------------|
+| `40` | Damper/Sustain Pedal on/off                    |
+| `41` | Portamento on/off                              |
+| `42` | Sostenuto on/off                               |
+| `43` | Soft Pedal on/off                              |
+| `44` | Legato Footswitch                              |
+| `45` | Hold 2                                         |
+| `46` | Sound Controller 1 (Sound Variation)           |
+| `47` | Sound Controller 2 (Timber/Harmonic Intensity) |
+| `48` | Sound Controller 3 (Release Time)              |
+| `49` | Sound Controller 4 (Attack Time)               |
+| `4A` | Sound Controller 5 (Brightness)                |
+| `4B` | Sound Controller 6 (Decay Time)                |
+| `4C` | Sound Controller 7 (Vibrato Rate)              |
+| `4D` | Sound Controller 8 (Vibrato Depth)             |
+| `4E` | Sound Controller 9 (Vibrato Delay)             |
+| `4F` | Sound Controller 10                            |
+| `50` | General Purpose 5                              |
+| `51` | General Purpose 6                              |
+| `52` | General Purpose 7                              |
+| `53` | General Purpose 8                              |
+| `54` | Portamento Control                             |
+| `55` | Undefined                                      |
+| `56` | Undefined                                      |
+| `57` | Undefined                                      |
+| `58` | High Resolution Velocity LSB (see CA-031)      |
+| `59` | Undefined                                      |
+| `5A` | Undefined                                      |
+| `5B` | Effect 1 Depth (Reverb Send Level)             |
+| `5C` | Effect 2 Depth (Tremolo Depth)                 |
+| `5D` | Effect 3 Depth (Chorus Send Level)             |
+| `5E` | Effect 4 Depth (Celeste Detune Depth)          |
+| `5F` | Effect 5 Depth (Phaser Depth)                  |
+
+#### High-resolution Controller
+
+```
+<DT> Bn NN MM
+<DT> Bn NN LL
+```
+
+There are 32 High-resolution Controllers.  These controllers have a 14 bit value, which is split
+between the 7 most significant bits (MSB `MM`), and 7 least significant bits (LSB `LL`).
+
+When the MSB is set, the LSB should be cleared to zero.  When the LSB is set, it should overwrite
+any previous LSB.  This allows a stream of LSB messages to modify the value a little bit without
+needing MSB messages (with the sole exception of the Bank Select control).
+
+Setting the MSB/LSB is determined via the value of `NN`:
+
+| MSB `NN` | LSB `NN` | Control                           |
+|----------|----------|-----------------------------------|
+| `00`     | `20`     | Bank Select (LSB always required) |
+| `01`     | `21`     | Modulation Wheel or Lever         |
+| `02`     | `22`     | Breath Controller                 |
+| `03`     | `23`     | Undefined                         |
+| `04`     | `24`     | Foot Controller                   |
+| `05`     | `25`     | Portamento Time                   |
+| `06`     | `26`     | Data Entry (RPNs/NRPNs)           |
+| `07`     | `27`     | Channel Volume                    |
+| `08`     | `28`     | Balance                           |
+| `09`     | `29`     | Undefined                         |
+| `0A`     | `2A`     | Pan                               |
+| `0B`     | `2B`     | Expression                        |
+| `0C`     | `2C`     | Effect Control 1                  |
+| `0D`     | `2D`     | Effect Control 2                  |
+| `0E`     | `2E`     | Undefined                         |
+| `0F`     | `2F`     | Undefined                         |
+| `10`     | `30`     | General Purpose 1                 |
+| `11`     | `31`     | General Purpose 2                 |
+| `12`     | `32`     | General Purpose 3                 |
+| `13`     | `33`     | General Purpose 4                 |
+| `14`     | `34`     | Undefined                         |
+| `15`     | `35`     | Undefined                         |
+| `16`     | `36`     | Undefined                         |
+| `17`     | `37`     | Undefined                         |
+| `18`     | `38`     | Undefined                         |
+| `19`     | `39`     | Undefined                         |
+| `1A`     | `3A`     | Undefined                         |
+| `1B`     | `3B`     | Undefined                         |
+| `1C`     | `3C`     | Undefined                         |
+| `1D`     | `3D`     | Undefined                         |
+| `1E`     | `3E`     | Undefined                         |
+| `1F`     | `3F`     | Undefined                         |
+
+So, for example, setting the General Purpose 2 value to `12 34` on channel 8 (`7`) would mean the
+sequence:
+
+```
+<DT> B7 11 12  # Set MSB of General Purpose 2 on channel 8 to 12H
+<DT> B7 31 34  # Set LSB of General Purpose 2 on channel 8 to 34H
+```
+
+Note that the value of `12 34` is actually the number 2356, *not* 4660, because 7 bits per byte are
+used.
+
+Balance (`08`/`28`) and Pan (`0A`/`2A`) values are defined in the specification that `00` is
+hard-left, `40` is centered, and `7F` is hard-right.  I assume this is talking about the MSB data
+value, which would mean `7F 00` is considered hard-right, effectively wasting `7F 01` through
+`7F 7F`.
+
+#### Registered/Non-Registered Parameter
+
+Registered Parameter Numbers (RPNs) and Non-Registered Parameter Numbers (NRPNs) expand the space of
+possible control values that can be changed.  RPNs are reserved for official parameters (table
+below), and NRPNs are reserved for private use.
+
+Each channel has a currently selected RPN/NRPN, which defaults to `7F 7F` (indicating no parameter
+is selected).
+
+To change an RPN/NRPN value, first select the parameter using:
+
+```
+<DT> Bn 65 MM  # Select RPN MSB
+<DT> Bn 64 LL  # Select RPN LSB
+```
+
+or:
+
+```
+<DT> Bn 63 MM  # Select NRPN MSB
+<DT> Bn 62 LL  # Select NRPN LSB
+```
+
+(As far as I can tell, the order of the messages selecting the parameter shouldn't matter)
+
+Once a parameter is selected, it can be set using the Data Entry messages under the High-resolution
+Controller (`06`/`26`).
+
+Alternatively, the value's LSB can be incremented or decremented (with proper overflow/underflow
+affecting the MSB) using messages `Bn 60 XX` (increment), or `Bn 61 XX` (decrement).  The data
+values (`XX`) are ignored.
+
+Once the RPN/NRPN is finished being modified, it's recommended to select the `7F 7F` parameter
+again, indicating no parameter is selected.
+
+| MSB  | LSB  | Control                                         | Inc/Dec              |
+|------|------|-------------------------------------------------|----------------------|
+| `00` | `00` | Pitch Bend Range (MSB = semitones, LSB = cents) | LSB, wrapping at 100 |
+| `00` | `01` | Fine Tuning                                     | LSB                  |
+| `00` | `02` | Coarse Tuning                                   | MSB                  |
+| `00` | `03` | Tuning Program Select                           | MSB                  |
+| `00` | `04` | Tuning Bank Select                              | MSB                  |
+| `00` | `05` | Modulation Depth Range                          | LSB (?)              |
+| `3D` | `00` | Azimuth Angle                                   | LSB (?)              |
+| `3D` | `01` | Elevation Angle                                 | LSB (?)              |
+| `3D` | `02` | Gain                                            | LSB (?)              |
+| `3D` | `03` | Distance Ratio                                  | LSB (?)              |
+| `3D` | `04` | Maximum Distance                                | LSB (?)              |
+| `3D` | `05` | Gain at Maximum Distance                        | LSB (?)              |
+| `3D` | `06` | Reference Distance Ratio                        | LSB (?)              |
+| `3D` | `07` | Pan Spread Angle                                | LSB (?)              |
+| `3D` | `08` | Roll Angle                                      | LSB (?)              |
+| `7F` | `7F` | Deselect RPN                                    | LSB (?)              |
+
+Note that increment and decrement commands affect RPNs differently, depending on which RPN is
+selected.  When the LSB over/underflows, the MSB should be affected accordingly.  Pitch Bend Range
+in particular is interesting because the LSB represents cents, which means it should wrap at 100
+(not 127).  See RP-018.
+
+#### Channel Mode
+
+```
+<DT> Bn NN VV
+```
+
+Lastly, there are a few Controllers that have special meaning, with `NN` ranging from `78`-`7F`.
+
+| `NN` | `VV` | Action                                                           |
+|------|------|------------------------------------------------------------------|
+| `78` | `00` | All Sound Off                                                    |
+| `79` | `00` | Reset All Controllers                                            |
+| `7A` | `VV` | Local Control (`VV` = `00` off, `7F` on)                         |
+| `7B` | `00` | All Notes Off                                                    |
+| `7C` | `00` | Omni Off                                                         |
+| `7D` | `00` | Omni On                                                          |
+| `7E` | `VV` | Mono On (Poly Off) (`VV` = number of channels, `00` for all)     |
+| `7F` | `00` | Poly On (Mono Off)                                               |
+
+#### Undefined Controllers
+
+If you've been paying attention, there are a range of controllers that aren't allocated, `66`-`77`.
+These are reserved as single byte controllers.
 
 ### SysEx Event
 
