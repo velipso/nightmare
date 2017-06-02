@@ -378,9 +378,9 @@ or:
 Once a parameter is selected, it can be set using the Data Entry messages under the High-resolution
 Controller (`06`/`26`).
 
-Alternatively, the value's LSB can be incremented or decremented (with proper overflow/underflow
-affecting the MSB) using messages `Bn 60 XX` (increment), or `Bn 61 XX` (decrement).  The data
-values (`XX`) are ignored.
+The value can also be incremented or decremented using messages `Bn 60 XX` (increment), or
+`Bn 61 XX` (decrement).  The data values (`XX`) are ignored.  The value is
+incremented/decremented differently, based on which RPN selected (explained below).
 
 Once the RPN/NRPN is finished being modified, it's recommended to select the `7F 7F` parameter
 again, indicating no parameter is selected.
