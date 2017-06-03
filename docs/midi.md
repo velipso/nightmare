@@ -146,7 +146,7 @@ A single MTrk event consists of a delta timestamp and an event:
 
 | Name                 | Size         | Description                                               |
 |----------------------|--------------|-----------------------------------------------------------|
-| Delta Timestamp (DT) | Variable Int |Number of ticks this event occurs relative to previous event|
+| Delta Timestamp &lt;DT&gt;|Variable Int| Number of ticks this event occurs relative to previous |
 | Event                | Varies according to event | Channel Message, SysEx Event, or Meta Event  |
 
 ### Variable Int Quantities
@@ -188,19 +188,34 @@ Channel Messages start with a single byte in the range `80` to `EF`.  The lower 
 the channel `n` (0-15 are usually displayed as 1-16), and the higher 4 bits represent the message
 type.  For example, `94` is a Note On message for channel 5.
 
-| Message | Parameter 1             | Parameter 2                     | Description               |
-|---------|-------------------------|---------------------------------|---------------------------|
-| `8n`    | Note (`00` to `7F`)     | Release Velocity (`00` to `7F`) | Note Off                  |
-| `9n`    | Note (`00` to `7F`)     | Hit Velocity (`00` to `7F`)     | Note On                   |
-| `An`    | Note (`00` to `7F`)     | Pressure (`00` to `7F`)         | Note Pressure             |
-| `Bn`    | Control (`00` to `7F`)  | Value (`00` to `7F`)            | Control Change            |
-| `Cn`    | Patch (`00` to `7F`)    | N/A                             | Program Change            |
-| `Dn`    | Pressure (`00` to `7F`) | N/A                             | Channel Pressure          |
-| `En`    | Bend Change LSB (`00` to `7F`) | Bend Change MSB (`00` to `7F`) | Pitch Bend          |
+| Type | Parameter 1             | Parameter 2                     | Description               |
+|------|-------------------------|---------------------------------|---------------------------|
+| `8n` | Note (`00` to `7F`)     | Release Velocity (`00` to `7F`) | Note Off                  |
+| `9n` | Note (`00` to `7F`)     | Hit Velocity (`00` to `7F`)     | Note On                   |
+| `An` | Note (`00` to `7F`)     | Pressure (`00` to `7F`)         | Note Pressure             |
+| `Bn` | Control (`00` to `7F`)  | Value (`00` to `7F`)            | Control Change            |
+| `Cn` | Patch (`00` to `7F`)    | N/A                             | Program Change            |
+| `Dn` | Pressure (`00` to `7F`) | N/A                             | Channel Pressure          |
+| `En` | Bend Change LSB (`00` to `7F`) | Bend Change MSB (`00` to `7F`) | Pitch Bend          |
 
 #### Running Status
 
-TODO: running status only applies to Channel Messages
+Running status is based on the fact that it is very common for a string of consecutive Channel
+Messages to be of the same type.  For example, when a chord is played on a keyboard, ten successive
+Note On messages may be generated.
+
+If a Channel Message is processed (`8n`-`En`), then the message type should be saved.  If a future
+sequence is missing a type (detected if the first byte is less than `80`), then it should be
+interpretted as the same message type as the previous message.
+
+```
+<DT> 94 45 40  # Note On, note 45, velocity 40
+<DT>    49 40  # Note On, note 49, velocity 40
+<DT>    4D 40  # Note On, note 4D, velocity 40
+<DT> 84 45 40  # Note Off, note 45, release 40
+<DT>    49 40  # Note Off, note 49, release 40
+<DT>    4D 40  # Note Off, note 4D, release 40
+```
 
 #### Notes
 
