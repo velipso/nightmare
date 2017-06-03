@@ -512,6 +512,18 @@ static inline const char *ss(int num){
 	return num == 1 ? "" : "s";
 }
 
+static inline nm_patch calc_patch(int bank, int patch){
+	#define X(en, code, str)                                          \
+		if (((code & 0xF0000) >> 16) == 1 && /* melody instrument */  \
+			((code & 0x0FF00) >>  8) == patch && /* patch matches */  \
+			((code & 0x000FF)      ) == bank) /* bank matches */      \
+			return NM_ ## en;
+	NM_EACH_PATCH(X)
+	#undef X
+	// if nothing matches, return NM__PATCH_END to indicate failure
+	return NM__PATCH_END;
+}
+
 bool nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_warn, void *user){
 	if (size < 14 ||
 		data[0] != 'M' || data[1] != 'T' || data[2] != 'h' || data[3] != 'd' ||
@@ -628,6 +640,31 @@ bool nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_
 					warn(f_warn, user, "Too many simultaneous tracks, ignoring track %d", track_i);
 					goto mtrk_end;
 				}
+				struct {                  //     ML
+					//                           VV------ MSB and LSB are correctly set
+					//                             VVVV-- values
+					int bank;             // = 0x110000 = bank 0
+					int rpn;              // = 0x117F7F = unselected RPN
+					int pitch_bend_range; // = 0x111800 = 24 semitones = +-12 semitones
+					bool nrpn;            // = true if .rpn is an NRPN, false if .rpn is an RPN
+				} ctrls[16] = {
+					{ 0x110000, 0x117F7F, 0x111800, 0 },
+					{ 0x110000, 0x117F7F, 0x111800, 0 },
+					{ 0x110000, 0x117F7F, 0x111800, 0 },
+					{ 0x110000, 0x117F7F, 0x111800, 0 },
+					{ 0x110000, 0x117F7F, 0x111800, 0 },
+					{ 0x110000, 0x117F7F, 0x111800, 0 },
+					{ 0x110000, 0x117F7F, 0x111800, 0 },
+					{ 0x110000, 0x117F7F, 0x111800, 0 },
+					{ 0x110000, 0x117F7F, 0x111800, 0 },
+					{ 0x110000, 0x117F7F, 0x111800, 0 },
+					{ 0x110000, 0x117F7F, 0x111800, 0 },
+					{ 0x110000, 0x117F7F, 0x111800, 0 },
+					{ 0x110000, 0x117F7F, 0x111800, 0 },
+					{ 0x110000, 0x117F7F, 0x111800, 0 },
+					{ 0x110000, 0x117F7F, 0x111800, 0 },
+					{ 0x110000, 0x117F7F, 0x111800, 0 }
+				};
 				running_status = -1;
 				uint64_t p = chk.data_start;
 				uint64_t p_end = chk.data_start + chk.data_size;
@@ -768,7 +805,7 @@ bool nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_
 						}
 						running_status = msg;
 						uint8_t ctrl = data[p++];
-						uint8_t val = data[p++];
+						int val = data[p++];
 						if (ctrl >= 0x80){
 							warn(f_warn, user, "Bad Control Change message (invalid control "
 								" %02X) in track %d", ctrl, track_i);
@@ -779,7 +816,155 @@ bool nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_
 								"in track %d", val, track_i);
 							val ^= 0x80;
 						}
-						// TODO: deal with ctrl/val
+
+						int chan = msg & 0xF;
+						if (ctrl == 0x00){ // Bank Select MSB
+							int bank = ctrls[chan].bank;
+							if ((bank & 0x110000) == 0x110000) // if both set, clear LSB
+								ctrls[chan].bank = 0x100000 | (val << 8);
+							else // otherwise, add to LSB
+								ctrls[chan].bank = (bank & 0x0F00FF) | 0x100000 | (val << 8);
+						}
+						else if (ctrl == 0x20){ // Bank Select LSB
+							int bank = ctrls[chan].bank;
+							if ((bank & 0x110000) == 0x110000) // if both set, clear MSB
+								ctrls[chan].bank = 0x010000 | val;
+							else // otherwise, add to MSB
+								ctrls[chan].bank = (bank & 0xF0FF00) | 0x010000 | val;
+						}
+						else if (ctrl == 0x06){ // RPN Data MSB
+							int rpn = ctrls[chan].rpn;
+							if ((rpn & 0x110000) == 0x110000 && rpn != 0x117F7F){
+								if (rpn == 0x110000 && !ctrls[chan].nrpn){ // pitch bend range
+									int pbr = ctrls[chan].pitch_bend_range;
+									if ((pbr & 0x110000) == 0x110000) // if both set, clear LSB
+										ctrls[chan].pitch_bend_range = 0x100000 | (val << 8);
+									else{ // otherwise, add to LSB
+										ctrls[chan].pitch_bend_range =
+											(pbr & 0x0F00FF) | 0x100000 | (val << 8);
+									}
+								}
+							}
+							else
+								warn(f_warn, user, "Incomplete selected RPN in track %d", track_i);
+						}
+						else if (ctrl == 0x26){ // RPN Data LSB
+							int rpn = ctrls[chan].rpn;
+							if ((rpn & 0x110000) == 0x110000 && rpn != 0x117F7F){
+								if (rpn == 0x110000 && !ctrls[chan].nrpn){ // pitch bend range
+									if (val >= 100){
+										warn(f_warn, user, "Bad pitch bend range (invalid cents) "
+											"in track %d", track_i);
+										val = 0;
+									}
+									int pbr = ctrls[chan].pitch_bend_range;
+									if ((pbr & 0x110000) == 0x110000) // if both set, clear MSB
+										ctrls[chan].pitch_bend_range = 0x010000 | val;
+									else{ // otherwise, add to MSB
+										ctrls[chan].pitch_bend_range =
+											(pbr & 0xF0FF00) | 0x010000 | val;
+									}
+								}
+							}
+							else
+								warn(f_warn, user, "Incomplete selected RPN in track %d", track_i);
+						}
+						else if (ctrl == 0x60){ // N/RPN Increment
+							int rpn = ctrls[chan].rpn;
+							if ((rpn & 0x110000) == 0x110000 && rpn != 0x117F7F){
+								if (rpn == 0x110000 && !ctrls[chan].nrpn){ // pitch bend range
+									int pbr = ctrls[chan].pitch_bend_range;
+									if ((pbr & 0x110000) == 0x110000){
+										int lsb = pbr & 0x7F;
+										int msb = (pbr >> 8) & 0x7F;
+										lsb++;
+										if (lsb >= 100){
+											lsb = 0;
+											msb++;
+											if (msb > 0x7F){
+												warn(f_warn, user, "Pitch bend range overflow in "
+													"track %d", track_i);
+												lsb = pbr & 0x7F;
+												msb = (pbr >> 8) & 0x7F;
+											}
+										}
+										ctrls[chan].pitch_bend_range = 0x110000 | (msb << 8) | lsb;
+									}
+									else{
+										warn(f_warn, user, "Cannot increment incomplete Pitch Bend "
+											"Range in track %d", track_i);
+									}
+								}
+							}
+							else
+								warn(f_warn, user, "Incomplete selected RPN in track %d", track_i);
+						}
+						else if (ctrl == 0x61){ // N/RPN Decrement
+							int rpn = ctrls[chan].rpn;
+							if ((rpn & 0x110000) == 0x110000 && rpn != 0x117F7F){
+								if (rpn == 0x110000 && !ctrls[chan].nrpn){ // pitch bend range
+									int pbr = ctrls[chan].pitch_bend_range;
+									if ((pbr & 0x110000) == 0x110000){
+										int lsb = pbr & 0x7F;
+										int msb = (pbr >> 8) & 0x7F;
+										lsb--;
+										if (lsb < 0){
+											lsb = 99;
+											msb--;
+											if (msb < 0){
+												warn(f_warn, user, "Pitch bend range underflow in "
+													"track %d", track_i);
+												lsb = pbr & 0x7F;
+												msb = (pbr >> 8) & 0x7F;
+											}
+										}
+										ctrls[chan].pitch_bend_range = 0x110000 | (msb << 8) | lsb;
+									}
+									else{
+										warn(f_warn, user, "Cannot decrement incomplete Pitch Bend "
+											"Range in track %d", track_i);
+									}
+								}
+							}
+							else
+								warn(f_warn, user, "Incomplete selected RPN in track %d", track_i);
+						}
+						else if (ctrl == 0x62){ // Select NRPN LSB
+							int rpn = ctrls[chan].rpn;
+							if (!ctrls[chan].nrpn || (rpn & 0x110000) == 0x110000){ // clear MSB
+								ctrls[chan].rpn = 0x010000 | val;
+								ctrls[chan].nrpn = true;
+							}
+							else // otherwise, add to MSB
+								ctrls[chan].rpn = (rpn & 0xF0FF00) | 0x010000 | val;
+						}
+						else if (ctrl == 0x63){ // Select NRPN MSB
+							int rpn = ctrls[chan].rpn;
+							if (!ctrls[chan].nrpn || (rpn & 0x110000) == 0x110000){ // clear LSB
+								ctrls[chan].rpn = 0x100000 | (val << 8);
+								ctrls[chan].nrpn = true;
+							}
+							else // otherwise, add to LSB
+								ctrls[chan].rpn = (rpn & 0x0F00FF) | 0x100000 | (val << 8);
+						}
+						else if (ctrl == 0x64){ // Select RPN LSB
+							int rpn = ctrls[chan].rpn;
+							if (ctrls[chan].nrpn || (rpn & 0x110000) == 0x110000){ // clear MSB
+								ctrls[chan].rpn = 0x010000 | val;
+								ctrls[chan].nrpn = false;
+							}
+							else // otherwise, add to MSB
+								ctrls[chan].rpn = (rpn & 0xF0FF00) | 0x010000 | val;
+						}
+						else if (ctrl == 0x65){ // Select RPN MSB
+							int rpn = ctrls[chan].rpn;
+							if (ctrls[chan].nrpn || (rpn & 0x110000) == 0x110000){ // clear LSB
+								ctrls[chan].rpn = 0x100000 | (val << 8);
+								ctrls[chan].nrpn = false;
+							}
+							else // otherwise, add to LSB
+								ctrls[chan].rpn = (rpn & 0x0F00FF) | 0x100000 | (val << 8);
+						}
 					}
 					else if (msg >= 0xC0 && msg < 0xD0){ // Program Change
 						if (p >= p_end){
@@ -794,7 +979,22 @@ bool nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_
 								"%02X) in track %d", patch, track_i);
 							patch ^= 0x80;
 						}
-						// TODO: deal with nm_ev_patch (mapping patch+bank to nm_patch)
+						int chan = msg & 0xF;
+						int bank = ctrls[chan].bank;
+						if ((bank & 0x110000) != 0x110000){
+							warn(f_warn, user, "Incomplete bank in track %d", track_i);
+							bank = 0;
+						}
+						else
+							bank = bank & 0xFFFF;
+						nm_patch p = calc_patch(bank, patch);
+						if (p == NM__PATCH_END){
+							warn(f_warn, user, "Unknown patch %02X (bank %04X), defaulting to "
+								"piano, in track %d", patch, bank, track_i);
+							p = NM_PIANO_ACGR;
+						}
+						if (!nm_ev_patch(ctx, ticks, chan_base + chan, p))
+							return false;
 					}
 					else if (msg >= 0xD0 && msg < 0xE0){ // Channel Pressure
 						if (p >= p_end){
@@ -832,6 +1032,9 @@ bool nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_
 								"%02X) in track %d", p2, track_i);
 							p2 ^= 0x80;
 						}
+						int chan = msg & 0xF;
+
+						// calculate bendf ranging from -1.0f to 1.0f
 						uint16_t bend = p1 | (p2 << 7);
 						float bendf;
 						if (bend < 0x2000)
@@ -840,7 +1043,21 @@ bool nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_
 							bendf = 0;
 						else
 							bendf = (float)(bend - 0x2000) / 8191.0f;
-						if (!nm_ev_chanbend(ctx, ticks, chan_base + (msg & 0xF), bendf))
+
+						// calculate bendrange in number of semitones
+						int pbr = ctrls[chan].pitch_bend_range;
+						if ((pbr & 0x110000) != 0x110000){
+							warn(f_warn, user, "Incomplete pitch bend range in track %d", track_i);
+							pbr = 0x1800;
+						}
+						else
+							pbr = pbr & 0xFFFF;
+						float bendrange;
+						int semitones = (pbr >> 8) & 0x7F;
+						int cents = pbr & 0x7F;
+						bendrange = semitones + (float)cents / 100.0f;
+
+						if (!nm_ev_chanbend(ctx, ticks, chan_base + chan, bendf * bendrange * 0.5f))
 							return false;
 					}
 					else if (msg == 0xF0 || msg == 0xF7){ // SysEx Event
@@ -1235,6 +1452,19 @@ bool nm_ev_chanbend(nm_ctx ctx, uint32_t tick, uint16_t channel, float bend){
 	return true;
 }
 
+bool nm_ev_chanvol(nm_ctx ctx, uint32_t tick, uint16_t channel, float volume){
+	if (channel >= ctx->channel_count)
+		return false;
+	nm_wevent wev = nm_alloc(sizeof(nm_wevent_st));
+	if (wev == NULL)
+		return false;
+	wev->ev.type = NM_EV_CHANVOL;
+	wev->ev.channel = channel;
+	wev->ev.u.data2f = volume;
+	wev_insert(ctx, tick, wev);
+	return true;
+}
+
 bool nm_ev_tempo(nm_ctx ctx, uint32_t tick, uint8_t num, uint8_t den, float tempo){
 	// `den` must be power of 2 between 1-128
 	nm_wevent wev = nm_alloc(sizeof(nm_wevent_st));
@@ -1596,6 +1826,9 @@ void nm_ctx_process(nm_ctx ctx, int sample_len, nm_sample samples){
 			// TODO: this
 		}
 		else if (ev->type == NM_EV_CHANBEND){
+			// TODO: this
+		}
+		else if (ev->type == NM_EV_CHANVOL){
 			// TODO: this
 		}
 		else if (ev->type == NM_EV_TEMPO){
