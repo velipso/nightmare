@@ -451,12 +451,11 @@ struct nm_voice_struct {
 	void *patchinf;
 	void *voiceinf;
 	nm_patch patch;
+	nm_channel channel;
 	uint8_t note;
-	uint16_t channel;
 	int samptot;
 	int cyctot;
 	float vel;
-	float mod;
 	float cyc;
 	float dcyc;
 	bool down;
@@ -465,6 +464,7 @@ struct nm_voice_struct {
 
 struct nm_channel_struct {
 	nm_patch patch;
+	float vol;
 	float bend;
 	float mod;
 };

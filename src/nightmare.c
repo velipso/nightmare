@@ -352,6 +352,7 @@ nm_ctx nm_ctx_new(uint16_t ticks_per_quarternote, uint16_t channels, int voices,
 		goto cleanup;
 	for (int i = 0; i < channels; i++){
 		ctx->channels[i].patch = NM_PIANO_ACGR; // TODO: what is proper intialization?
+		ctx->channels[i].vol = 0.5f;
 		ctx->channels[i].mod = 0;
 		ctx->channels[i].bend = 0;
 	}
@@ -1673,6 +1674,7 @@ static void render_sect(nm_ctx ctx, int len, nm_sample samples){
 			// default additive synthesizer
 			nm_defvoiceinf vi = vc->voiceinf;
 			nm_defpatchinf pi = vc->patchinf;
+			float vol = vc->channel->vol;
 			float fade = vi->fade;
 			float dfade = vi->dfade;
 			float peak = pi->peak;
@@ -1700,7 +1702,7 @@ static void render_sect(nm_ctx ctx, int len, nm_sample samples){
 				float cyc = vc->cyc;
 				float dcyc = vc->dcyc;
 				for (int a = 0; a < len; a++){
-					float v = fade * fade *
+					float v = vol * fade * fade *
 						wave_harmonic(fmodf(cyc + a * dcyc, 1.0f), h1, h2, h3, h4, f_wave);
 					if (dfade > 0){
 						fade += dfade;
@@ -1819,11 +1821,10 @@ void nm_ctx_process(nm_ctx ctx, int sample_len, nm_sample samples){
 				vc->patchinf = ctx->patchinf[pt];
 				vc->patch = pt;
 				vc->note = ev->data1;
-				vc->channel = ev->channel;
+				vc->channel = chan;
 				vc->samptot = 0;
 				vc->cyctot = 0;
 				vc->vel = ev->u.data2f;
-				vc->mod = 0;
 				vc->cyc = 0;
 				// TODO: wire frequency of note to a tuning table
 				float freq = 440.0f * powf(2.0f, ((float)ev->data1 - 69.0f) / 12.0f);
@@ -1840,7 +1841,8 @@ void nm_ctx_process(nm_ctx ctx, int sample_len, nm_sample samples){
 			// search for the right note/channel and turn it off
 			nm_voice vc = ctx->voices_used;
 			while (vc){
-				if (vc->channel == ev->channel && vc->note == ev->data1 && vc->down){
+				if (vc->channel == &ctx->channels[ev->channel] &&
+					vc->note == ev->data1 && vc->down){
 					vc->down = false;
 					vc->released = true;
 					ctx->notecnt[ev->data1]--;
@@ -1856,7 +1858,8 @@ void nm_ctx_process(nm_ctx ctx, int sample_len, nm_sample samples){
 			// TODO: this
 		}
 		else if (ev->type == NM_EV_CHANVOL){
-			// TODO: this
+			nm_channel chan = &ctx->channels[ev->channel];
+			chan->vol = ev->u.data2f;
 		}
 		else if (ev->type == NM_EV_TEMPO){
 			ctx->ts_num = ev->channel;
