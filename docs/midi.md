@@ -400,7 +400,7 @@ incremented/decremented differently, based on which RPN selected (explained belo
 Once the RPN/NRPN is finished being modified, it's recommended to select the `7F 7F` parameter
 again, indicating no parameter is selected.
 
-| MSB  | LSB  | Control                                         | Inc/Dec              |
+| MSB `MM` | LSB `LL` | Control                                 | Inc/Dec              |
 |------|------|-------------------------------------------------|----------------------|
 | `00` | `00` | Pitch Bend Range (MSB = semitones, LSB = cents) | LSB, wrapping at 100 |
 | `00` | `01` | Fine Tuning                                     | LSB                  |
