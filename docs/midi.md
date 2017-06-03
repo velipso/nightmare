@@ -146,7 +146,7 @@ A single MTrk event consists of a delta timestamp and an event:
 
 | Name                 | Size         | Description                                               |
 |----------------------|--------------|-----------------------------------------------------------|
-| Delta Timestamp &lt;DT&gt;|Variable Int| Number of ticks this event occurs relative to previous |
+| Delta Timestamp `<DT>` | Variable Int | Number of ticks this event occurs relative to previous  |
 | Event                | Varies according to event | Channel Message, SysEx Event, or Meta Event  |
 
 ### Variable Int Quantities
