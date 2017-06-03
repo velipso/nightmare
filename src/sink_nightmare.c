@@ -201,13 +201,28 @@ static sink_val L_channel(sink_ctx ctx, int size, sink_val *args, nm_user u){
 	return sink_num(u->channel);
 }
 
+static sink_val L_volume(sink_ctx ctx, int size, sink_val *args, nm_user u){
+	double ticks;
+	if (!sink_arg_num(ctx, size, args, 0, &ticks))
+		return SINK_NIL;
+	double vol;
+	if (!sink_arg_num(ctx, size, args, 1, &vol))
+		return SINK_NIL;
+	uint32_t t = (uint32_t)ticks;
+	if (t != ticks)
+		return sink_abortcstr(ctx, "Invalid ticks; expecting integer");
+	if (!nm_ev_chanvol(u->ctx, t, u->channel, (float)vol))
+		return sink_abortcstr(ctx, "Failed to insert event");
+	return sink_bool(true);
+}
+
 static sink_val L_reset(sink_ctx ctx, int size, sink_val *args, nm_user u){
 	double ticks;
 	if (!sink_arg_num(ctx, size, args, 0, &ticks))
 		return SINK_NIL;
 	uint32_t t = (uint32_t)ticks;
 	if (t != ticks)
-		return sink_abortcstr(ctx, "Invalid ticks; expecting integers");
+		return sink_abortcstr(ctx, "Invalid ticks; expecting integer");
 	if (size > 1){
 		double tpq;
 		if (!sink_arg_num(ctx, size, args, 1, &tpq))
@@ -370,6 +385,7 @@ void sink_nightmare_scr(sink_scr scr){
 		"declare patchcat  'nightmare.patchcat' ;"
 		"declare note      'nightmare.note'     ;"
 		"declare channel   'nightmare.channel'  ;"
+		"declare volume    'nightmare.volume'   ;"
 		"declare reset     'nightmare.reset'    ;"
 		"declare noteplay  'nightmare.noteplay' ;"
 		"declare tempo     'nightmare.tempo'    ;"
@@ -393,6 +409,7 @@ bool sink_nightmare_ctx(sink_ctx ctx, nm_ctx nctx){
 	sink_ctx_native(ctx, "nightmare.patchcat" , u, (sink_native_func)L_patchcat );
 	sink_ctx_native(ctx, "nightmare.note"     , u, (sink_native_func)L_note     );
 	sink_ctx_native(ctx, "nightmare.channel"  , u, (sink_native_func)L_channel  );
+	sink_ctx_native(ctx, "nightmare.volume"   , u, (sink_native_func)L_volume   );
 	sink_ctx_native(ctx, "nightmare.reset"    , u, (sink_native_func)L_reset    );
 	sink_ctx_native(ctx, "nightmare.noteplay" , u, (sink_native_func)L_noteplay );
 	sink_ctx_native(ctx, "nightmare.tempo"    , u, (sink_native_func)L_tempo    );

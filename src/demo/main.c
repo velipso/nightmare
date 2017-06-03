@@ -379,6 +379,7 @@ static sink_val L_help(sink_ctx ctx, int size, sink_val *args, void *user){
 		"  channel [c]        # select a channel for future commands\n"
 		"  defpatch p, wave, peak, attack, decay, sustain, harmonic1, h2, h3, h4\n"
 		"                     # overwrite the default patch parameters for patch p\n"
+		"  volume tick, v     # insert a new volume for the current channel\n"
 		"  note 'C4'          # convert a string to a note number\n"
 		"  note C4            # convert a note number to a list\n"
 		"  note {'C', 4}      # convert a list {note, octave} to a note number\n"
