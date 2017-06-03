@@ -645,25 +645,28 @@ bool nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_
 					//                             VVVV-- values
 					int bank;             // = 0x110000 = bank 0
 					int rpn;              // = 0x117F7F = unselected RPN
-					int pitch_bend_range; // = 0x111800 = 24 semitones = +-12 semitones
 					bool nrpn;            // = true if .rpn is an NRPN, false if .rpn is an RPN
+					int pitch_bend_range; // = 0x111800 = 24 semitones = +-12 semitones
+					bool chvol_dirty;     // = true if chvol has been set to something
+					int chvol;            // =   0x4000 = 0.5 linear (TODO: I suppose)
+					uint32_t chvol_ticks; // = when the chvol was set
 				} ctrls[16] = {
-					{ 0x110000, 0x117F7F, 0x111800, 0 },
-					{ 0x110000, 0x117F7F, 0x111800, 0 },
-					{ 0x110000, 0x117F7F, 0x111800, 0 },
-					{ 0x110000, 0x117F7F, 0x111800, 0 },
-					{ 0x110000, 0x117F7F, 0x111800, 0 },
-					{ 0x110000, 0x117F7F, 0x111800, 0 },
-					{ 0x110000, 0x117F7F, 0x111800, 0 },
-					{ 0x110000, 0x117F7F, 0x111800, 0 },
-					{ 0x110000, 0x117F7F, 0x111800, 0 },
-					{ 0x110000, 0x117F7F, 0x111800, 0 },
-					{ 0x110000, 0x117F7F, 0x111800, 0 },
-					{ 0x110000, 0x117F7F, 0x111800, 0 },
-					{ 0x110000, 0x117F7F, 0x111800, 0 },
-					{ 0x110000, 0x117F7F, 0x111800, 0 },
-					{ 0x110000, 0x117F7F, 0x111800, 0 },
-					{ 0x110000, 0x117F7F, 0x111800, 0 }
+					{ 0x110000, 0x117F7F, 0, 0x111800, 0, 0x4000, 0 },
+					{ 0x110000, 0x117F7F, 0, 0x111800, 0, 0x4000, 0 },
+					{ 0x110000, 0x117F7F, 0, 0x111800, 0, 0x4000, 0 },
+					{ 0x110000, 0x117F7F, 0, 0x111800, 0, 0x4000, 0 },
+					{ 0x110000, 0x117F7F, 0, 0x111800, 0, 0x4000, 0 },
+					{ 0x110000, 0x117F7F, 0, 0x111800, 0, 0x4000, 0 },
+					{ 0x110000, 0x117F7F, 0, 0x111800, 0, 0x4000, 0 },
+					{ 0x110000, 0x117F7F, 0, 0x111800, 0, 0x4000, 0 },
+					{ 0x110000, 0x117F7F, 0, 0x111800, 0, 0x4000, 0 },
+					{ 0x110000, 0x117F7F, 0, 0x111800, 0, 0x4000, 0 },
+					{ 0x110000, 0x117F7F, 0, 0x111800, 0, 0x4000, 0 },
+					{ 0x110000, 0x117F7F, 0, 0x111800, 0, 0x4000, 0 },
+					{ 0x110000, 0x117F7F, 0, 0x111800, 0, 0x4000, 0 },
+					{ 0x110000, 0x117F7F, 0, 0x111800, 0, 0x4000, 0 },
+					{ 0x110000, 0x117F7F, 0, 0x111800, 0, 0x4000, 0 },
+					{ 0x110000, 0x117F7F, 0, 0x111800, 0, 0x4000, 0 }
 				};
 				running_status = -1;
 				uint64_t p = chk.data_start;
@@ -696,10 +699,24 @@ bool nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_
 
 					ticks += dt;
 
+					// check dirty values
 					if (ti_dirty && ticks != ti_ticks){
 						if (!nm_ev_tempo(ctx, ti_ticks, ti_tsnum, ti_tsden, ti_tempo))
 							return false;
 						ti_dirty = false;
+					}
+					for (int chan = 0; chan < 16; chan++){
+						if (ctrls[chan].chvol_dirty && ticks != ctrls[chan].chvol_ticks){
+							int chvol = ctrls[chan].chvol;
+							int msb = (chvol >> 8) & 0x7F;
+							int lsb = chvol & 0x7F;
+							if (msb == 0x7F)
+								lsb = 0;
+							float vol = (float)(msb * 0x80 + lsb) / 16256.0f;
+							if (!nm_ev_chanvol(ctx, ctrls[chan].chvol_ticks, chan, vol))
+								return false;
+							ctrls[chan].chvol_dirty = false;
+						}
 					}
 
 					if (p >= p_end){
@@ -848,6 +865,11 @@ bool nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_
 							else
 								warn(f_warn, user, "Incomplete selected RPN in track %d", track_i);
 						}
+						else if (ctrl == 0x07){ // Channel Volume MSB
+							ctrls[chan].chvol = val << 8;
+							ctrls[chan].chvol_dirty = true;
+							ctrls[chan].chvol_ticks = ticks;
+						}
 						else if (ctrl == 0x26){ // RPN Data LSB
 							int rpn = ctrls[chan].rpn;
 							if ((rpn & 0x110000) == 0x110000 && rpn != 0x117F7F){
@@ -868,6 +890,11 @@ bool nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_
 							}
 							else
 								warn(f_warn, user, "Incomplete selected RPN in track %d", track_i);
+						}
+						else if (ctrl == 0x27){ // Channel Volume LSB
+							ctrls[chan].chvol = (ctrls[chan].chvol & 0xFF00) | val;
+							ctrls[chan].chvol_dirty = true;
+							ctrls[chan].chvol_ticks = ticks;
 						}
 						else if (ctrl == 0x60){ // N/RPN Increment
 							int rpn = ctrls[chan].rpn;
