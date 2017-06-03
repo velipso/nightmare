@@ -77,6 +77,7 @@ bool        nm_ev_noteoff(nm_ctx ctx, uint32_t tick, uint16_t channel, uint8_t n
 bool        nm_ev_chanmod(nm_ctx ctx, uint32_t tick, uint16_t channel, float mod);
 bool        nm_ev_chanbend(nm_ctx ctx, uint32_t tick, uint16_t channel, float bend);
 bool        nm_ev_chanvol(nm_ctx ctx, uint32_t tick, uint16_t channel, float volume);
+bool        nm_ev_chanexp(nm_ctx ctx, uint32_t tick, uint16_t channel, float expression);
 bool        nm_ev_tempo(nm_ctx ctx, uint32_t tick, uint8_t num, uint8_t den, float tempo);
 bool        nm_ev_patch(nm_ctx ctx, uint32_t tick, uint16_t channel, nm_patch patch);
 void        nm_defpatch(nm_patch patch, uint8_t wave, float peak, float attack, float decay,
@@ -403,6 +404,7 @@ enum nm_event_type_enum {
 	NM_EV_CHANMOD,
 	NM_EV_CHANBEND,
 	NM_EV_CHANVOL,
+	NM_EV_CHANEXP,
 	NM_EV_TEMPO,
 	NM_EV_PATCH
 };
@@ -464,7 +466,8 @@ struct nm_voice_struct {
 
 struct nm_channel_struct {
 	nm_patch patch;
-	float vol;
+	float vol; // volume, linear
+	float exp; // expression, 0 to 1, fraction of vol to use; i.e., actual volume = exp * vol
 	float bend;
 	float mod;
 };
