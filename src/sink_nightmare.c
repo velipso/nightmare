@@ -233,6 +233,23 @@ static sink_val L_expression(sink_ctx ctx, int size, sink_val *args, nm_user u){
 	return sink_bool(true);
 }
 
+static sink_val L_pan(sink_ctx ctx, int size, sink_val *args, nm_user u){
+	double ticks;
+	if (!sink_arg_num(ctx, size, args, 0, &ticks))
+		return SINK_NIL;
+	double pan;
+	if (!sink_arg_num(ctx, size, args, 1, &pan))
+		return SINK_NIL;
+	uint32_t t = (uint32_t)ticks;
+	if (t != ticks)
+		return sink_abortcstr(ctx, "Invalid ticks; expecting integer");
+	if (pan < -1 || pan > 1)
+		return sink_abortcstr(ctx, "Invalid pan; must be in range [-1, 1]");
+	if (!nm_ev_chanpan(u->ctx, t, u->channel, (float)pan))
+		return sink_abortcstr(ctx, "Failed to insert event");
+	return sink_bool(true);
+}
+
 static sink_val L_reset(sink_ctx ctx, int size, sink_val *args, nm_user u){
 	double ticks;
 	if (!sink_arg_num(ctx, size, args, 0, &ticks))
@@ -404,6 +421,7 @@ void sink_nightmare_scr(sink_scr scr){
 		"declare channel    'nightmare.channel'   ;"
 		"declare volume     'nightmare.volume'    ;"
 		"declare expression 'nightmare.expression';"
+		"declare pan        'nightmare.pan'       ;"
 		"declare reset      'nightmare.reset'     ;"
 		"declare noteplay   'nightmare.noteplay'  ;"
 		"declare tempo      'nightmare.tempo'     ;"
@@ -429,6 +447,7 @@ bool sink_nightmare_ctx(sink_ctx ctx, nm_ctx nctx){
 	sink_ctx_native(ctx, "nightmare.channel"   , u, (sink_native_func)L_channel   );
 	sink_ctx_native(ctx, "nightmare.volume"    , u, (sink_native_func)L_volume    );
 	sink_ctx_native(ctx, "nightmare.expression", u, (sink_native_func)L_expression);
+	sink_ctx_native(ctx, "nightmare.pan"       , u, (sink_native_func)L_pan       );
 	sink_ctx_native(ctx, "nightmare.reset"     , u, (sink_native_func)L_reset     );
 	sink_ctx_native(ctx, "nightmare.noteplay"  , u, (sink_native_func)L_noteplay  );
 	sink_ctx_native(ctx, "nightmare.tempo"     , u, (sink_native_func)L_tempo     );

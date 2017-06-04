@@ -78,6 +78,7 @@ bool        nm_ev_chanmod(nm_ctx ctx, uint32_t tick, uint16_t channel, float mod
 bool        nm_ev_chanbend(nm_ctx ctx, uint32_t tick, uint16_t channel, float bend);
 bool        nm_ev_chanvol(nm_ctx ctx, uint32_t tick, uint16_t channel, float volume);
 bool        nm_ev_chanexp(nm_ctx ctx, uint32_t tick, uint16_t channel, float expression);
+bool        nm_ev_chanpan(nm_ctx ctx, uint32_t tick, uint16_t channel, float pan);
 bool        nm_ev_tempo(nm_ctx ctx, uint32_t tick, uint8_t num, uint8_t den, float tempo);
 bool        nm_ev_patch(nm_ctx ctx, uint32_t tick, uint16_t channel, nm_patch patch);
 void        nm_defpatch(nm_patch patch, uint8_t wave, float peak, float attack, float decay,
@@ -405,6 +406,7 @@ enum nm_event_type_enum {
 	NM_EV_CHANBEND,
 	NM_EV_CHANVOL,
 	NM_EV_CHANEXP,
+	NM_EV_CHANPAN,
 	NM_EV_TEMPO,
 	NM_EV_PATCH
 };
@@ -468,6 +470,7 @@ struct nm_channel_struct {
 	nm_patch patch;
 	float vol; // volume, linear
 	float exp; // expression, 0 to 1, fraction of vol to use; i.e., actual volume = exp * vol
+	float pan; // -1 (left) ... 0 (center) ... 1 (right)
 	float bend;
 	float mod;
 };

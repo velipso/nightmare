@@ -372,15 +372,16 @@ static inline void printctxerr(sink_ctx ctx){
 }
 
 static sink_val L_help(sink_ctx ctx, int size, sink_val *args, void *user){
-	sink_val help = sink_str_newcstr(ctx,
+	return sink_str_newcstr(ctx,
 		"Help: Nightmare Sink API\n"
 		"  bake tick          # send the events within `tick` to the engine\n"
 		"  bakeall            # send all pending events to the engine\n"
 		"  channel [c]        # select a channel for future commands\n"
 		"  defpatch p, wave, peak, attack, decay, sustain, harmonic1, h2, h3, h4\n"
 		"                     # overwrite the default patch parameters for patch p\n"
-		"  volume tick, v     # insert a new volume for the current channel\n"
-		"  expression tick, e # insert a new expression level for current channel\n"
+		"  volume tick, v     # insert volume event for the current channel\n"
+		"  expression tick, e # fraction of volume to use\n"
+		"  pan tick, p        # insert pan event, -1 left, 0 center, 1 right\n"
 		"  note 'C4'          # convert a string to a note number\n"
 		"  note C4            # convert a note number to a list\n"
 		"  note {'C', 4}      # convert a list {note, octave} to a note number\n"
@@ -399,11 +400,8 @@ static sink_val L_help(sink_ctx ctx, int size, sink_val *args, void *user){
 		"> noteplay   0, 100, C4    # play C4 starting at tick 0 for 100 ticks\n"
 		"> noteplay 100, 100, D4    # play D4 starting at tick 100 for 100 ticks\n"
 		"> noteplay 200, 100, E4    # play E4 starting at tick 200 for 100 ticks\n"
-		"> bakeall                  # send all pending events to the engine\n"
-		"... the notes play ..."
+		"> bakeall                  # send all pending events to the engine"
 	);
-	sink_say(ctx, 1, &help);
-	return SINK_NIL;
 }
 
 static inline int repl(nm_ctx nctx){
@@ -415,6 +413,7 @@ static inline int repl(nm_ctx nctx){
 		"using music;"
 		"declare help 'nightmaremain.help';");
 	sink_ctx_native(ctx, "nightmaremain.help", NULL, L_help);
+	printf("Type \"help\" to read a list of sink commands\n");
 	int line = 1;
 	int bufsize = 0;
 	int bufcount = 200;

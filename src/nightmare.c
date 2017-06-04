@@ -354,6 +354,7 @@ nm_ctx nm_ctx_new(uint16_t ticks_per_quarternote, uint16_t channels, int voices,
 		ctx->channels[i].patch = NM_PIANO_ACGR; // TODO: what is proper intialization?
 		ctx->channels[i].vol = 0.5f;
 		ctx->channels[i].exp = 1.0f;
+		ctx->channels[i].pan = 0;
 		ctx->channels[i].mod = 0;
 		ctx->channels[i].bend = 0;
 	}
@@ -377,9 +378,8 @@ nm_ctx nm_ctx_new(uint16_t ticks_per_quarternote, uint16_t channels, int voices,
 		sizeof_patchinf = sizeof(nm_defpatchinf_st);
 	for (int i = 0; i < NM__PATCH_END; i++){
 		ctx->patchinf[i] = nm_alloc(sizeof_patchinf);
-		if (ctx->patchinf[i] == NULL){
-			return NULL;
-		}
+		if (ctx->patchinf[i] == NULL)
+			goto cleanup;
 	}
 
 	memset(ctx->notecnt, 0, sizeof(int) * 128);
@@ -655,23 +655,26 @@ bool nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_
 					bool chexp_dirty;
 					int chexp;
 					uint32_t chexp_ticks;
+					bool chpan_dirty;
+					int chpan;
+					uint32_t chpan_ticks;
 				} ctrls[16] = {
-					{ 0x110000, 0x117F7F, 0, 0x111800, 0, 0x4000, 0, 0, 0x7F00, 0 },
-					{ 0x110000, 0x117F7F, 0, 0x111800, 0, 0x4000, 0, 0, 0x7F00, 0 },
-					{ 0x110000, 0x117F7F, 0, 0x111800, 0, 0x4000, 0, 0, 0x7F00, 0 },
-					{ 0x110000, 0x117F7F, 0, 0x111800, 0, 0x4000, 0, 0, 0x7F00, 0 },
-					{ 0x110000, 0x117F7F, 0, 0x111800, 0, 0x4000, 0, 0, 0x7F00, 0 },
-					{ 0x110000, 0x117F7F, 0, 0x111800, 0, 0x4000, 0, 0, 0x7F00, 0 },
-					{ 0x110000, 0x117F7F, 0, 0x111800, 0, 0x4000, 0, 0, 0x7F00, 0 },
-					{ 0x110000, 0x117F7F, 0, 0x111800, 0, 0x4000, 0, 0, 0x7F00, 0 },
-					{ 0x110000, 0x117F7F, 0, 0x111800, 0, 0x4000, 0, 0, 0x7F00, 0 },
-					{ 0x110000, 0x117F7F, 0, 0x111800, 0, 0x4000, 0, 0, 0x7F00, 0 },
-					{ 0x110000, 0x117F7F, 0, 0x111800, 0, 0x4000, 0, 0, 0x7F00, 0 },
-					{ 0x110000, 0x117F7F, 0, 0x111800, 0, 0x4000, 0, 0, 0x7F00, 0 },
-					{ 0x110000, 0x117F7F, 0, 0x111800, 0, 0x4000, 0, 0, 0x7F00, 0 },
-					{ 0x110000, 0x117F7F, 0, 0x111800, 0, 0x4000, 0, 0, 0x7F00, 0 },
-					{ 0x110000, 0x117F7F, 0, 0x111800, 0, 0x4000, 0, 0, 0x7F00, 0 },
-					{ 0x110000, 0x117F7F, 0, 0x111800, 0, 0x4000, 0, 0, 0x7F00, 0 }
+					{ 0x110000, 0x117F7F, 0, 0x111800, 0, 0x4000, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
+					{ 0x110000, 0x117F7F, 0, 0x111800, 0, 0x4000, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
+					{ 0x110000, 0x117F7F, 0, 0x111800, 0, 0x4000, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
+					{ 0x110000, 0x117F7F, 0, 0x111800, 0, 0x4000, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
+					{ 0x110000, 0x117F7F, 0, 0x111800, 0, 0x4000, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
+					{ 0x110000, 0x117F7F, 0, 0x111800, 0, 0x4000, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
+					{ 0x110000, 0x117F7F, 0, 0x111800, 0, 0x4000, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
+					{ 0x110000, 0x117F7F, 0, 0x111800, 0, 0x4000, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
+					{ 0x110000, 0x117F7F, 0, 0x111800, 0, 0x4000, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
+					{ 0x110000, 0x117F7F, 0, 0x111800, 0, 0x4000, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
+					{ 0x110000, 0x117F7F, 0, 0x111800, 0, 0x4000, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
+					{ 0x110000, 0x117F7F, 0, 0x111800, 0, 0x4000, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
+					{ 0x110000, 0x117F7F, 0, 0x111800, 0, 0x4000, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
+					{ 0x110000, 0x117F7F, 0, 0x111800, 0, 0x4000, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
+					{ 0x110000, 0x117F7F, 0, 0x111800, 0, 0x4000, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
+					{ 0x110000, 0x117F7F, 0, 0x111800, 0, 0x4000, 0, 0, 0x7F00, 0, 0, 0x4000, 0 }
 				};
 				running_status = -1;
 				uint64_t p = chk.data_start;
@@ -732,6 +735,22 @@ bool nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_
 							if (!nm_ev_chanvol(ctx, ctrls[chan].chexp_ticks, chan, exp))
 								return false;
 							ctrls[chan].chexp_dirty = false;
+						}
+						if (ctrls[chan].chpan_dirty && ticks != ctrls[chan].chpan_ticks){
+							int chpan = ctrls[chan].chpan;
+							int msb = (chpan >> 8) & 0x7F;
+							int lsb = chpan & 0x7F;
+							if (msb == 0x7F)
+								lsb = 0;
+							msb = (msb << 7) | lsb;
+							float pan;
+							if (msb < 0x2000)
+								pan = (float)msb / 8192.0f - 1.0f;
+							else
+								pan = (float)(msb - 0x2000) / 8064.0f; // not 8192 b/c 7F 00 is max
+							if (!nm_ev_chanpan(ctx, ctrls[chan].chexp_ticks, chan, pan))
+								return false;
+							ctrls[chan].chpan_dirty = false;
 						}
 					}
 
@@ -886,6 +905,11 @@ bool nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_
 							ctrls[chan].chvol_dirty = true;
 							ctrls[chan].chvol_ticks = ticks;
 						}
+						else if (ctrl == 0x0A){ // Channel Pan MSB
+							ctrls[chan].chpan = val << 8;
+							ctrls[chan].chpan_dirty = true;
+							ctrls[chan].chpan_ticks = ticks;
+						}
 						else if (ctrl == 0x0B){ // Channel Expression MSB
 							ctrls[chan].chexp = val << 8;
 							ctrls[chan].chexp_dirty = true;
@@ -916,6 +940,11 @@ bool nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_
 							ctrls[chan].chvol = (ctrls[chan].chvol & 0xFF00) | val;
 							ctrls[chan].chvol_dirty = true;
 							ctrls[chan].chvol_ticks = ticks;
+						}
+						else if (ctrl == 0x2A){ // Channel Pan LSB
+							ctrls[chan].chpan = (ctrls[chan].chpan & 0xFF00) | val;
+							ctrls[chan].chpan_dirty = true;
+							ctrls[chan].chpan_ticks = ticks;
 						}
 						else if (ctrl == 0x2B){ // Channel Expression LSB
 							ctrls[chan].chexp = (ctrls[chan].chexp & 0xFF00) | val;
@@ -1531,6 +1560,19 @@ bool nm_ev_chanexp(nm_ctx ctx, uint32_t tick, uint16_t channel, float expression
 	return true;
 }
 
+bool nm_ev_chanpan(nm_ctx ctx, uint32_t tick, uint16_t channel, float pan){
+	if (channel >= ctx->channel_count)
+		return false;
+	nm_wevent wev = nm_alloc(sizeof(nm_wevent_st));
+	if (wev == NULL)
+		return false;
+	wev->ev.type = NM_EV_CHANPAN;
+	wev->ev.channel = channel;
+	wev->ev.u.data2f = pan < -1 ? -1 : (pan > 1 ? 1 : pan);
+	wev_insert(ctx, tick, wev);
+	return true;
+}
+
 bool nm_ev_tempo(nm_ctx ctx, uint32_t tick, uint8_t num, uint8_t den, float tempo){
 	// `den` must be power of 2 between 1-128
 	nm_wevent wev = nm_alloc(sizeof(nm_wevent_st));
@@ -1713,6 +1755,9 @@ static void render_sect(nm_ctx ctx, int len, nm_sample samples){
 			nm_defvoiceinf vi = vc->voiceinf;
 			nm_defpatchinf pi = vc->patchinf;
 			float vol = vc->channel->vol * vc->channel->exp;
+			float pan = vc->channel->pan;
+			float pan_L = pan <= 0 ? 1 : 1 - pan;
+			float pan_R = pan >= 0 ? 1 : pan + 1;
 			float fade = vi->fade;
 			float dfade = vi->dfade;
 			float peak = pi->peak;
@@ -1755,8 +1800,8 @@ static void render_sect(nm_ctx ctx, int len, nm_sample samples){
 						if (fade <= 0)
 							fade = 0;
 					}
-					samples[a].L += v;
-					samples[a].R += v;
+					samples[a].L += pan_L * v;
+					samples[a].R += pan_R * v;
 				}
 				vi->fade = fade;
 			}
@@ -1902,6 +1947,10 @@ void nm_ctx_process(nm_ctx ctx, int sample_len, nm_sample samples){
 		else if (ev->type == NM_EV_CHANEXP){
 			nm_channel chan = &ctx->channels[ev->channel];
 			chan->exp = ev->u.data2f;
+		}
+		else if (ev->type == NM_EV_CHANPAN){
+			nm_channel chan = &ctx->channels[ev->channel];
+			chan->pan = ev->u.data2f;
 		}
 		else if (ev->type == NM_EV_TEMPO){
 			ctx->ts_num = ev->channel;
