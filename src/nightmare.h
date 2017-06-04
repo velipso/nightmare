@@ -155,9 +155,9 @@ enum nm_patchcat_enum {
 	X(CHROM_MARI    , 0x10C00, "Marimba"                               )  \
 	X(CHROM_MARI_WI , 0x10C01, "Marimba (wide)"                        )  \
 	X(CHROM_XYLO    , 0x10D00, "Xylophone"                             )  \
-	X(CHROM_BELL_TU , 0x10E00, "Bells (tubular)"                       )  \
-	X(CHROM_BELL_CH , 0x10E01, "Bells (church)"                        )  \
-	X(CHROM_BELL_CA , 0x10E02, "Bells (carillon)"                      )  \
+	X(CHROM_BELL_TU , 0x10E00, "Tubular Bells"                         )  \
+	X(CHROM_BELL_CH , 0x10E01, "Tubular Bells (church)"                )  \
+	X(CHROM_BELL_CA , 0x10E02, "Tubular Bells (carillon)"              )  \
 	X(CHROM_DULC    , 0x10F00, "Dulcimer"                              )  \
 	X(ORGAN_DRAW    , 0x11000, "Drawbar Organ"                         )  \
 	X(ORGAN_DRAW_DT , 0x11001, "Drawbar Organ (detuned)"               )  \
@@ -173,7 +173,7 @@ enum nm_patchcat_enum {
 	X(ORGAN_REED    , 0x11400, "Reed Organ"                            )  \
 	X(ORGAN_REED_PU , 0x11401, "Reed Organ (puff)"                     )  \
 	X(ORGAN_ACCO    , 0x11500, "Accordion"                             )  \
-	X(ORGAN_ACCO_2  , 0x11501, "Accordion 2"                           )  \
+	X(ORGAN_ACCO_2  , 0x11501, "Accordion (alternative)"               )  \
 	X(ORGAN_HARM    , 0x11600, "Harmonica"                             )  \
 	X(ORGAN_TANG    , 0x11700, "Tango Accordion"                       )  \
 	X(GUITAR_NYLO   , 0x11800, "Nylon Acoustic Guitar"                 )  \
@@ -339,46 +339,46 @@ enum nm_patchcat_enum {
 	X(PERC_SYDR_EL  , 0x17602, "Synth Drum (electric)"                 )  \
 	X(PERC_RECY     , 0x17700, "Reverse Cymbal"                        )  \
 	X(SFX2_G0_GUFR  , 0x17800, "Guitar Fret Noise"                     )  \
-	X(SFX2_G0_GUCU  , 0x17801, "Guitar Cutting Noise"                  )  \
-	X(SFX2_G0_STSL  , 0x17802, "Acoustic Bass String Slap"             )  \
+	X(SFX2_G0_GUCU  , 0x17801, "Guitar Cutting Noise (GM2)"            )  \
+	X(SFX2_G0_STSL  , 0x17802, "Acoustic Bass String Slap (GM2)"       )  \
 	X(SFX2_G1_BRNO  , 0x17900, "Breath Noise"                          )  \
-	X(SFX2_G1_FLKC  , 0x17901, "Flute Key Click"                       )  \
+	X(SFX2_G1_FLKC  , 0x17901, "Flute Key Click (GM2)"                 )  \
 	X(SFX2_G2_SEAS  , 0x17A00, "Seashore"                              )  \
-	X(SFX2_G2_RAIN  , 0x17A01, "Rain"                                  )  \
-	X(SFX2_G2_THUN  , 0x17A02, "Thunder"                               )  \
-	X(SFX2_G2_WIND  , 0x17A03, "Wind"                                  )  \
-	X(SFX2_G2_STRE  , 0x17A04, "Stream"                                )  \
-	X(SFX2_G2_BUBB  , 0x17A05, "Bubble"                                )  \
+	X(SFX2_G2_RAIN  , 0x17A01, "Rain (GM2)"                            )  \
+	X(SFX2_G2_THUN  , 0x17A02, "Thunder (GM2)"                         )  \
+	X(SFX2_G2_WIND  , 0x17A03, "Wind (GM2)"                            )  \
+	X(SFX2_G2_STRE  , 0x17A04, "Stream (GM2)"                          )  \
+	X(SFX2_G2_BUBB  , 0x17A05, "Bubble (GM2)"                          )  \
 	X(SFX2_G3_BTW1  , 0x17B00, "Bird Tweet 1"                          )  \
-	X(SFX2_G3_DOG   , 0x17B01, "Dog"                                   )  \
-	X(SFX2_G3_HOGA  , 0x17B02, "Horse Gallop"                          )  \
-	X(SFX2_G3_BTW2  , 0x17B03, "Bird Tweet 2"                          )  \
+	X(SFX2_G3_DOG   , 0x17B01, "Dog (GM2)"                             )  \
+	X(SFX2_G3_HOGA  , 0x17B02, "Horse Gallop (GM2)"                    )  \
+	X(SFX2_G3_BTW2  , 0x17B03, "Bird Tweet 2 (GM2)"                    )  \
 	X(SFX2_G4_TEL1  , 0x17C00, "Telephone Ring 1"                      )  \
-	X(SFX2_G4_TEL2  , 0x17C01, "Telephone Ring 2"                      )  \
-	X(SFX2_G4_DOCR  , 0x17C02, "Door Creaking"                         )  \
-	X(SFX2_G4_DOOR  , 0x17C03, "Door"                                  )  \
-	X(SFX2_G4_SCRA  , 0x17C04, "Scratch"                               )  \
-	X(SFX2_G4_WICH  , 0x17C05, "Wind Chime"                            )  \
+	X(SFX2_G4_TEL2  , 0x17C01, "Telephone Ring 2 (GM2)"                )  \
+	X(SFX2_G4_DOCR  , 0x17C02, "Door Creaking (GM2)"                   )  \
+	X(SFX2_G4_DOOR  , 0x17C03, "Door (GM2)"                            )  \
+	X(SFX2_G4_SCRA  , 0x17C04, "Scratch (GM2)"                         )  \
+	X(SFX2_G4_WICH  , 0x17C05, "Wind Chime (GM2)"                      )  \
 	X(SFX2_G5_HELI  , 0x17D00, "Helicopter"                            )  \
-	X(SFX2_G5_CAEN  , 0x17D01, "Car Engine"                            )  \
-	X(SFX2_G5_CAST  , 0x17D02, "Car Stop"                              )  \
-	X(SFX2_G5_CAPA  , 0x17D03, "Car Pass"                              )  \
-	X(SFX2_G5_CACR  , 0x17D04, "Car Crash"                             )  \
-	X(SFX2_G5_SIRE  , 0x17D05, "Siren"                                 )  \
-	X(SFX2_G5_TRAI  , 0x17D06, "Train"                                 )  \
-	X(SFX2_G5_JETP  , 0x17D07, "Jetplane"                              )  \
-	X(SFX2_G5_STAR  , 0x17D08, "Starship"                              )  \
-	X(SFX2_G5_BUNO  , 0x17D09, "Burst Noise"                           )  \
+	X(SFX2_G5_CAEN  , 0x17D01, "Car Engine (GM2)"                      )  \
+	X(SFX2_G5_CAST  , 0x17D02, "Car Stop (GM2)"                        )  \
+	X(SFX2_G5_CAPA  , 0x17D03, "Car Pass (GM2)"                        )  \
+	X(SFX2_G5_CACR  , 0x17D04, "Car Crash (GM2)"                       )  \
+	X(SFX2_G5_SIRE  , 0x17D05, "Siren (GM2)"                           )  \
+	X(SFX2_G5_TRAI  , 0x17D06, "Train (GM2)"                           )  \
+	X(SFX2_G5_JETP  , 0x17D07, "Jetplane (GM2)"                        )  \
+	X(SFX2_G5_STAR  , 0x17D08, "Starship (GM2)"                        )  \
+	X(SFX2_G5_BUNO  , 0x17D09, "Burst Noise (GM2)"                     )  \
 	X(SFX2_G6_APPL  , 0x17E00, "Applause"                              )  \
-	X(SFX2_G6_LAUG  , 0x17E01, "Laughing"                              )  \
-	X(SFX2_G6_SCRE  , 0x17E02, "Screaming"                             )  \
-	X(SFX2_G6_PUNC  , 0x17E03, "Punch"                                 )  \
-	X(SFX2_G6_HEBE  , 0x17E04, "Heart Beat"                            )  \
-	X(SFX2_G6_FOOT  , 0x17E05, "Footsteps"                             )  \
+	X(SFX2_G6_LAUG  , 0x17E01, "Laughing (GM2)"                        )  \
+	X(SFX2_G6_SCRE  , 0x17E02, "Screaming (GM2)"                       )  \
+	X(SFX2_G6_PUNC  , 0x17E03, "Punch (GM2)"                           )  \
+	X(SFX2_G6_HEBE  , 0x17E04, "Heart Beat (GM2)"                      )  \
+	X(SFX2_G6_FOOT  , 0x17E05, "Footsteps (GM2)"                       )  \
 	X(SFX2_G7_GUSH  , 0x17F00, "Gun Shot"                              )  \
-	X(SFX2_G7_MAGU  , 0x17F01, "Machine Gun"                           )  \
-	X(SFX2_G7_LAGU  , 0x17F02, "Laser Gun"                             )  \
-	X(SFX2_G7_EXPL  , 0x17F03, "Explosion"                             )  \
+	X(SFX2_G7_MAGU  , 0x17F01, "Machine Gun (GM2)"                     )  \
+	X(SFX2_G7_LAGU  , 0x17F02, "Laser Gun (GM2)"                       )  \
+	X(SFX2_G7_EXPL  , 0x17F03, "Explosion (GM2)"                       )  \
 	X(PERSND_STAN   , 0x20000, "PSS Standard"                          )  \
 	X(PERSND_ROOM   , 0x20800, "PSS Room"                              )  \
 	X(PERSND_POWE   , 0x21000, "PSS Power"                             )  \
@@ -462,6 +462,7 @@ struct nm_voice_struct {
 	float vel;
 	float cyc;
 	float dcyc;
+	float bend;
 	bool down;
 	bool released;
 };

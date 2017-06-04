@@ -1915,7 +1915,8 @@ void nm_ctx_process(nm_ctx ctx, int sample_len, nm_sample samples){
 				vc->vel = ev->u.data2f;
 				vc->cyc = 0;
 				// TODO: wire frequency of note to a tuning table
-				vc->dcyc = calc_dcyc(ctx->samples_per_sec, ev->data1, chan->bend);
+				vc->bend = chan->bend;
+				vc->dcyc = calc_dcyc(ctx->samples_per_sec, vc->note, vc->bend);
 				vc->down = true;
 				vc->released = false;
 				ctx->notecnt[ev->data1]++;
@@ -1939,15 +1940,19 @@ void nm_ctx_process(nm_ctx ctx, int sample_len, nm_sample samples){
 			}
 		}
 		else if (ev->type == NM_EV_CHANMOD){
-			// TODO: this
+			nm_channel chan = &ctx->channels[ev->channel];
+			chan->mod = ev->u.data2f;
 		}
 		else if (ev->type == NM_EV_CHANBEND){
 			nm_channel chan = &ctx->channels[ev->channel];
 			chan->bend = ev->u.data2f;
 			nm_voice vc = ctx->voices_used;
 			while (vc){
-				if (vc->channel == &ctx->channels[ev->channel])
-					vc->dcyc = calc_dcyc(ctx->samples_per_sec, vc->note, chan->bend);
+				if (vc->channel == &ctx->channels[ev->channel] &&
+					vc->patch == ctx->channels[ev->channel].patch){
+					vc->bend = chan->bend;
+					vc->dcyc = calc_dcyc(ctx->samples_per_sec, vc->note, vc->bend);
+				}
 				vc = vc->next;
 			}
 		}
@@ -1970,7 +1975,8 @@ void nm_ctx_process(nm_ctx ctx, int sample_len, nm_sample samples){
 			recalc_spt(ctx);
 		}
 		else if (ev->type == NM_EV_PATCH){
-			// TODO: this
+			nm_channel chan = &ctx->channels[ev->channel];
+			chan->patch = ev->u.data2i;
 		}
 
 		// advance read index

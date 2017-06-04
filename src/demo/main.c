@@ -628,6 +628,14 @@ int main(int argc, char **argv){
 			fprintf(stderr, "Out of memory\n");
 			goto cleanup;
 		}
+		// print all patches
+		int i = nctx->ev_read;
+		while (i != nctx->ev_write){
+			nm_event ev = &nctx->events[i];
+			if (ev->type == NM_EV_PATCH)
+				printf("Channel %3d: %s\n", ev->channel, nm_patch_str(ev->u.data2i));
+			i = (i + 1) % nctx->ev_size;
+		}
 	}
 	else if (run_mode == 2){
 		scr = getscr(SINK_SCR_FILE);
