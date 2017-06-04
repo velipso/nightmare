@@ -265,7 +265,7 @@ off and `7F` for on.
 
 | `NN` | Control                                        |
 |------|------------------------------------------------|
-| `40` | Damper/Sustain Pedal on/off                    |
+| `40` | Damper/Sustain Pedal (Hold 1) on/off           |
 | `41` | Portamento on/off                              |
 | `42` | Sostenuto on/off                               |
 | `43` | Soft Pedal on/off                              |
@@ -360,10 +360,20 @@ sequence:
 Note that the value of `12 34` is actually the number 2356, *not* 4660, because 7 bits per byte are
 used.
 
-Balance (`08`/`28`) and Pan (`0A`/`2A`) values are defined in the specification that `00` is
-hard-left, `40` is centered, and `7F` is hard-right.  I assume this is talking about the MSB data
-value, which would mean `7F 00` is considered hard-right, effectively wasting `7F 01` through
-`7F 7F`.
+Balance (`08`/`28`) and Pan (`0A`/`2A`) values are defined in the specification that `00 00` is
+hard-left and `7F 7F` is hard-right.
+
+The default value for Channel Volume should be `64 00` (i.e. 100 / 127).
+
+TODO: Volume + Expression formula (see GM2 docs)
+
+TODO: Panning formula (see GM2 docs)
+
+TODO: Bank Select of `79 XX` corresponds to the GM1 Sound Set
+
+TODO: Bank Select of `78 XX` corresponds to the GM1 Drum Set
+
+TODO: All channels default to `79 00` except Channel 10, which defaults to `78 00`.
 
 #### Registered/Non-Registered Parameter
 
@@ -400,29 +410,32 @@ incremented/decremented differently, based on which RPN selected (explained belo
 Once the RPN/NRPN is finished being modified, it's recommended to select the `7F 7F` parameter
 again, indicating no parameter is selected.
 
-| MSB `MM` | LSB `LL` | Control                                 | Inc/Dec              |
-|------|------|-------------------------------------------------|----------------------|
-| `00` | `00` | Pitch Bend Range (MSB = semitones, LSB = cents) | LSB, wrapping at 100 |
-| `00` | `01` | Fine Tuning                                     | LSB                  |
-| `00` | `02` | Coarse Tuning                                   | MSB                  |
-| `00` | `03` | Tuning Program Select                           | MSB                  |
-| `00` | `04` | Tuning Bank Select                              | MSB                  |
-| `00` | `05` | Modulation Depth Range                          | LSB (?)              |
-| `3D` | `00` | Azimuth Angle                                   | LSB (?)              |
-| `3D` | `01` | Elevation Angle                                 | LSB (?)              |
-| `3D` | `02` | Gain                                            | LSB (?)              |
-| `3D` | `03` | Distance Ratio                                  | LSB (?)              |
-| `3D` | `04` | Maximum Distance                                | LSB (?)              |
-| `3D` | `05` | Gain at Maximum Distance                        | LSB (?)              |
-| `3D` | `06` | Reference Distance Ratio                        | LSB (?)              |
-| `3D` | `07` | Pan Spread Angle                                | LSB (?)              |
-| `3D` | `08` | Roll Angle                                      | LSB (?)              |
-| `7F` | `7F` | Deselect RPN                                    | LSB (?)              |
+| MSB `MM` | LSB `LL` | Control                                         | Inc/Dec              |
+|----------|----------|-------------------------------------------------|----------------------|
+| `00`     | `00`     | Pitch Bend Range (MSB = semitones, LSB = cents) | LSB, wrapping at 100 |
+| `00`     | `01`     | Fine Tuning                                     | LSB                  |
+| `00`     | `02`     | Coarse Tuning                                   | MSB                  |
+| `00`     | `03`     | Tuning Program Select                           | MSB                  |
+| `00`     | `04`     | Tuning Bank Select                              | MSB                  |
+| `00`     | `05`     | Modulation Depth Range                          | LSB (?)              |
+| `3D`     | `00`     | Azimuth Angle                                   | LSB (?)              |
+| `3D`     | `01`     | Elevation Angle                                 | LSB (?)              |
+| `3D`     | `02`     | Gain                                            | LSB (?)              |
+| `3D`     | `03`     | Distance Ratio                                  | LSB (?)              |
+| `3D`     | `04`     | Maximum Distance                                | LSB (?)              |
+| `3D`     | `05`     | Gain at Maximum Distance                        | LSB (?)              |
+| `3D`     | `06`     | Reference Distance Ratio                        | LSB (?)              |
+| `3D`     | `07`     | Pan Spread Angle                                | LSB (?)              |
+| `3D`     | `08`     | Roll Angle                                      | LSB (?)              |
+| `7F`     | `7F`     | Deselect RPN                                    | LSB (?)              |
 
 Note that increment and decrement commands affect RPNs differently, depending on which RPN is
 selected.  When the LSB over/underflows, the MSB should be affected accordingly.  Pitch Bend Range
 in particular is interesting because the LSB represents cents, which means it should wrap at 100
 (not 127).  See RP-018.
+
+The default value for Pitch Bend Range is `02 00`, which is 2 semitones (i.e., a Pitch Bend message
+should affect the pitch at most &plusmn;2 semitones).
 
 #### Channel Mode
 
@@ -450,9 +463,39 @@ These are reserved as single byte controllers.
 
 ### SysEx Event
 
-`F0`, `F7`
+System Exclusive (SysEx) Events are used for transfering files/samples, timing information, and
+tuning.
 
-TODO
+| Name         | Size         | Description                                                      |
+|--------------|--------------|------------------------------------------------------------------|
+| `F0` or `F7` | 1 byte       | Byte indicating a SysEx Event                                    |
+| Data Size    | Variable Int | Length of the data for this event                                |
+| Data         | Data Size    | Raw data associated with SysEx Event                             |
+
+SysEx data can be broken into packets and sent as multiple SysEx Events, requiring the parser to
+piece together the parts before processing the entire event.  According to the MIDI specification,
+some systems will send packeted data at certain time intervals -- so the delay between packets could
+be meaningful too.
+
+In general though, software parsers should probably just ignore SysEx Events that it can't
+recognize -- it's easy to skip over the data since the length is always known.
+
+#### General MIDI SysEx
+
+There is a SysEx Event for enabling General MIDI or General MIDI 2.
+
+```
+<DT> F0 05 7E TT 09 GG F7
+```
+
+Where `TT` is the device target (usually `7F` to mean all devices), and `GG` is the General MIDI
+command:
+
+| `GG` | Description       |
+|------|-------------------|
+| `01` | General MIDI On   |
+| `02` | General MIDI Off  |
+| `03` | General MIDI 2 On |
 
 ### Meta Event
 
@@ -477,6 +520,8 @@ Any parameters spanning multiple bytes should be interpreted as big endian.
 | `FF 05 LL text`     | Lyric of length `LL`                                                      |
 | `FF 06 LL text`     | Marker of length `LL` ('First Verse', 'Chrous', etc)                      |
 | `FF 07 LL text`     | Cue Point of length `LL` ('curtain opens', 'character is slapped', etc)   |
+| `FF 08 LL text`     | Program Name of length `LL` (see RP-019)                                  |
+| `FF 09 LL text`     | Device Name of length `LL` (see RP-019)                                   |
 | `FF 20 01 NN`       | Channel Prefix, select channel `NN` (0-15) for future SysEx/Meta events   |
 | `FF 21 01 PP`       | MIDI Port, select output port `PP` for MIDI events                        |
 | `FF 2E ?? ????`     | Track Loop Event (?)                                                      |

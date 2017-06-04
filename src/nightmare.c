@@ -352,7 +352,7 @@ nm_ctx nm_ctx_new(uint16_t ticks_per_quarternote, uint16_t channels, int voices,
 		goto cleanup;
 	for (int i = 0; i < channels; i++){
 		ctx->channels[i].patch = NM_PIANO_ACGR; // TODO: what is proper intialization?
-		ctx->channels[i].vol = 0.5f;
+		ctx->channels[i].vol = 100.0f / 127.0f;
 		ctx->channels[i].exp = 1.0f;
 		ctx->channels[i].pan = 0;
 		ctx->channels[i].mod = 0;
@@ -515,10 +515,12 @@ static inline const char *ss(int num){
 }
 
 static inline nm_patch calc_patch(int bank, int patch){
-	#define X(en, code, str)                                          \
-		if (((code & 0xF0000) >> 16) == 1 && /* melody instrument */  \
-			((code & 0x0FF00) >>  8) == patch && /* patch matches */  \
-			((code & 0x000FF)      ) == bank) /* bank matches */      \
+	#define X(en, code, str)                                           \
+		if (((code & 0xF0000) >> 16) == 1 && /* melody instrument */   \
+			((code & 0x0FF00) >>  8) == patch && /* patch matches */   \
+			((bank & 0x0FF00) == 0x7900 || /* GM sound */              \
+			 (bank & 0x0FF00) == 0x0000) && /* default TODO: ? */      \
+			((code & 0x000FF)      ) == (bank & 0xFF)) /* bank LSB */  \
 			return NM_ ## en;
 	NM_EACH_PATCH(X)
 	#undef X
@@ -648,7 +650,7 @@ bool nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_
 					int bank;             // = 0x110000 = bank 0
 					int rpn;              // = 0x117F7F = unselected RPN
 					bool nrpn;            // = true if .rpn is an NRPN, false if .rpn is an RPN
-					int pitch_bend_range; // = 0x110200 = 2 semitones = +-1 semitones
+					int pitch_bend_range; // =   0x0200 = 2 semitones = +-1 semitones
 					bool chvol_dirty;     // = true if chvol has been set to something
 					int chvol;            // =   0x4000 = 0.5 linear (TODO: I suppose)
 					uint32_t chvol_ticks; // = when the chvol was set
@@ -659,22 +661,22 @@ bool nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_
 					int chpan;
 					uint32_t chpan_ticks;
 				} ctrls[16] = {
-					{ 0x110000, 0x117F7F, 0, 0x110200, 0, 0x4000, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
-					{ 0x110000, 0x117F7F, 0, 0x110200, 0, 0x4000, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
-					{ 0x110000, 0x117F7F, 0, 0x110200, 0, 0x4000, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
-					{ 0x110000, 0x117F7F, 0, 0x110200, 0, 0x4000, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
-					{ 0x110000, 0x117F7F, 0, 0x110200, 0, 0x4000, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
-					{ 0x110000, 0x117F7F, 0, 0x110200, 0, 0x4000, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
-					{ 0x110000, 0x117F7F, 0, 0x110200, 0, 0x4000, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
-					{ 0x110000, 0x117F7F, 0, 0x110200, 0, 0x4000, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
-					{ 0x110000, 0x117F7F, 0, 0x110200, 0, 0x4000, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
-					{ 0x110000, 0x117F7F, 0, 0x110200, 0, 0x4000, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
-					{ 0x110000, 0x117F7F, 0, 0x110200, 0, 0x4000, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
-					{ 0x110000, 0x117F7F, 0, 0x110200, 0, 0x4000, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
-					{ 0x110000, 0x117F7F, 0, 0x110200, 0, 0x4000, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
-					{ 0x110000, 0x117F7F, 0, 0x110200, 0, 0x4000, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
-					{ 0x110000, 0x117F7F, 0, 0x110200, 0, 0x4000, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
-					{ 0x110000, 0x117F7F, 0, 0x110200, 0, 0x4000, 0, 0, 0x7F00, 0, 0, 0x4000, 0 }
+					{ 0x117900, 0x117F7F, 0, 0x0200, 0, 0x4000, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
+					{ 0x117900, 0x117F7F, 0, 0x0200, 0, 0x4000, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
+					{ 0x117900, 0x117F7F, 0, 0x0200, 0, 0x4000, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
+					{ 0x117900, 0x117F7F, 0, 0x0200, 0, 0x4000, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
+					{ 0x117900, 0x117F7F, 0, 0x0200, 0, 0x4000, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
+					{ 0x117900, 0x117F7F, 0, 0x0200, 0, 0x4000, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
+					{ 0x117900, 0x117F7F, 0, 0x0200, 0, 0x4000, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
+					{ 0x117900, 0x117F7F, 0, 0x0200, 0, 0x4000, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
+					{ 0x117900, 0x117F7F, 0, 0x0200, 0, 0x4000, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
+					{ 0x117800, 0x117F7F, 0, 0x0200, 0, 0x4000, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
+					{ 0x117900, 0x117F7F, 0, 0x0200, 0, 0x4000, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
+					{ 0x117900, 0x117F7F, 0, 0x0200, 0, 0x4000, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
+					{ 0x117900, 0x117F7F, 0, 0x0200, 0, 0x4000, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
+					{ 0x117900, 0x117F7F, 0, 0x0200, 0, 0x4000, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
+					{ 0x117900, 0x117F7F, 0, 0x0200, 0, 0x4000, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
+					{ 0x117900, 0x117F7F, 0, 0x0200, 0, 0x4000, 0, 0, 0x7F00, 0, 0, 0x4000, 0 }
 				};
 				running_status = -1;
 				uint64_t p = chk.data_start;
@@ -716,38 +718,24 @@ bool nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_
 					for (int chan = 0; chan < 16; chan++){
 						if (ctrls[chan].chvol_dirty && ticks != ctrls[chan].chvol_ticks){
 							int chvol = ctrls[chan].chvol;
-							int msb = (chvol >> 8) & 0x7F;
-							int lsb = chvol & 0x7F;
-							if (msb == 0x7F)
-								lsb = 0;
-							float vol = (float)(msb * 0x80 + lsb) / 16256.0f;
+							chvol = ((chvol >> 1) & 0x3F80) | (chvol & 0x7F);
+							float vol = (float)chvol / 16383.0f;
 							if (!nm_ev_chanvol(ctx, ctrls[chan].chvol_ticks, chan, vol))
 								return false;
 							ctrls[chan].chvol_dirty = false;
 						}
 						if (ctrls[chan].chexp_dirty && ticks != ctrls[chan].chexp_ticks){
 							int chexp = ctrls[chan].chexp;
-							int msb = (chexp >> 8) & 0x7F;
-							int lsb = chexp & 0x7F;
-							if (msb == 0x7F)
-								lsb = 0;
-							float exp = (float)(msb * 0x80 + lsb) / 16256.0f;
+							chexp = ((chexp >> 1) & 0x3F80) | (chexp & 0x7F);
+							float exp = (float)chexp / 16383.0f;
 							if (!nm_ev_chanvol(ctx, ctrls[chan].chexp_ticks, chan, exp))
 								return false;
 							ctrls[chan].chexp_dirty = false;
 						}
 						if (ctrls[chan].chpan_dirty && ticks != ctrls[chan].chpan_ticks){
 							int chpan = ctrls[chan].chpan;
-							int msb = (chpan >> 8) & 0x7F;
-							int lsb = chpan & 0x7F;
-							if (msb == 0x7F)
-								lsb = 0;
-							msb = (msb << 7) | lsb;
-							float pan;
-							if (msb < 0x2000)
-								pan = (float)msb / 8192.0f - 1.0f;
-							else
-								pan = (float)(msb - 0x2000) / 8064.0f; // not 8192 b/c 7F 00 is max
+							chpan = ((chpan >> 1) & 0x3F80) | (chpan & 0x7F);
+							float pan = (float)chpan * 2.0f / 16383.0f - 1.0f;
 							if (!nm_ev_chanpan(ctx, ctrls[chan].chexp_ticks, chan, pan))
 								return false;
 							ctrls[chan].chpan_dirty = false;
@@ -887,15 +875,8 @@ bool nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_
 						else if (ctrl == 0x06){ // RPN Data MSB
 							int rpn = ctrls[chan].rpn;
 							if ((rpn & 0x110000) == 0x110000 && rpn != 0x117F7F){
-								if (rpn == 0x110000 && !ctrls[chan].nrpn){ // pitch bend range
-									int pbr = ctrls[chan].pitch_bend_range;
-									if ((pbr & 0x110000) == 0x110000) // if both set, clear LSB
-										ctrls[chan].pitch_bend_range = 0x100000 | (val << 8);
-									else{ // otherwise, add to LSB
-										ctrls[chan].pitch_bend_range =
-											(pbr & 0x0F00FF) | 0x100000 | (val << 8);
-									}
-								}
+								if (rpn == 0x110000 && !ctrls[chan].nrpn) // pitch bend range
+									ctrls[chan].pitch_bend_range = val << 8;
 							}
 							else
 								warn(f_warn, user, "Incomplete selected RPN in track %d", track_i);
@@ -924,13 +905,7 @@ bool nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_
 											"in track %d", track_i);
 										val = 0;
 									}
-									int pbr = ctrls[chan].pitch_bend_range;
-									if ((pbr & 0x110000) == 0x110000) // if both set, clear MSB
-										ctrls[chan].pitch_bend_range = 0x010000 | val;
-									else{ // otherwise, add to MSB
-										ctrls[chan].pitch_bend_range =
-											(pbr & 0xF0FF00) | 0x010000 | val;
-									}
+									ctrls[chan].pitch_bend_range |= val;
 								}
 							}
 							else
@@ -1129,19 +1104,12 @@ bool nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_
 							bendf = (float)(bend - 0x2000) / 8191.0f;
 
 						// calculate bendrange in number of semitones
-						int pbr = ctrls[chan].pitch_bend_range;
-						if ((pbr & 0x110000) != 0x110000){
-							warn(f_warn, user, "Incomplete pitch bend range in track %d", track_i);
-							pbr = 0x1800;
-						}
-						else
-							pbr = pbr & 0xFFFF;
 						float bendrange;
-						int semitones = (pbr >> 8) & 0x7F;
-						int cents = pbr & 0x7F;
+						int semitones = ctrls[chan].pitch_bend_range >> 8;
+						int cents = ctrls[chan].pitch_bend_range & 0x7F;
 						bendrange = semitones + (float)cents / 100.0f;
 
-						if (!nm_ev_chanbend(ctx, ticks, chan_base + chan, bendf * bendrange * 0.5f))
+						if (!nm_ev_chanbend(ctx, ticks, chan_base + chan, bendf * bendrange))
 							return false;
 					}
 					else if (msg == 0xF0 || msg == 0xF7){ // SysEx Event
@@ -1193,7 +1161,7 @@ bool nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_
 								printf(" %02X", data[p + i]);
 							printf("\n");
 						}
-						*/
+						// */
 						p += dl;
 					}
 					else if (msg == 0xFF){ // Meta Event
@@ -1219,6 +1187,8 @@ bool nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_
 							case 0x05: // LL text           Lyric
 							case 0x06: // LL text           Marker
 							case 0x07: // LL text           Cue Point
+							case 0x08: // LL text           Program Name
+							case 0x09: // LL text           Device Name
 							case 0x20: // 01 NN             Channel Prefix
 							case 0x21: // 01 PP             MIDI Port
 							case 0x2E: // ?????             "Track Loop Event"?
@@ -1303,6 +1273,11 @@ bool nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_
 							default:
 								warn(f_warn, user, "Unknown Meta Event %02X in track %d",
 									type, track_i);
+								/*
+								for (int i = 0; i < len; i++)
+									printf("%02X ", data[p + i]);
+								printf("\n");
+								// */
 								break;
 						}
 						p += len;
