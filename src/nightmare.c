@@ -1071,9 +1071,11 @@ bool nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_
 							bank = bank & 0xFFFF;
 						nm_patch p = calc_patch(bank, patch);
 						if (p == NM__PATCH_END){
+							p = calc_patch(0, patch);
+							if (p == NM__PATCH_END)
+								p = NM_PIANO_ACGR;
 							warn(f_warn, user, "Unknown patch %02X (bank %04X), defaulting to "
-								"piano, in track %d", patch, bank, track_i);
-							p = NM_PIANO_ACGR;
+								"\"%s\", in track %d", patch, bank, nm_patch_str(p), track_i);
 						}
 						if (!nm_ev_patch(ctx, ticks, chan_base + chan, p))
 							return false;
