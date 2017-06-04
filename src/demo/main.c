@@ -280,10 +280,10 @@ static int sdl_render_audio(void *data){
 		if (hs){
 			SDL_SemWait(lock_nm);
 			nm_ctx_process(ctx, sample_buffer_size, sample_buffer);
+			print_piano(ctx);
 			SDL_SemPost(lock_nm);
 			sf_compressor_process(&compressor, sample_buffer_size, (sf_sample_st *)sample_buffer,
 				(sf_sample_st *)sample_buffer);
-			print_piano(ctx);
 		}
 		#ifndef NDEBUG
 		// crappy click detection
@@ -387,6 +387,7 @@ static sink_val L_help(sink_ctx ctx, int size, sink_val *args, void *user){
 		"  note {'C', 4}      # convert a list {note, octave} to a note number\n"
 		"  noteplay tick, dur, note[, vel]\n"
 		"                     # insert a note to play for duration\n"
+		"  bend tick, b       # pitch bend the current channel by b semitones\n"
 		"  patch tick, p      # switch patch for the current channel to p (number)\n"
 		"  patchcat p         # get patch p's (number) category name\n"
 		"  patchname p        # get patch p's (number) descriptive name\n"

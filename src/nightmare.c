@@ -1828,6 +1828,11 @@ static void render_sect(nm_ctx ctx, int len, nm_sample samples){
 	}
 }
 
+static inline float calc_dcyc(float sps, float note, float bend){
+	float freq = 440.0f * powf(2.0f, ((note + bend) - 69.0f) / 12.0f);
+	return freq / sps;
+}
+
 void nm_ctx_process(nm_ctx ctx, int sample_len, nm_sample samples){
 	int total_out = 0;
 	while (ctx->ev_read != ctx->ev_write){
@@ -1910,8 +1915,7 @@ void nm_ctx_process(nm_ctx ctx, int sample_len, nm_sample samples){
 				vc->vel = ev->u.data2f;
 				vc->cyc = 0;
 				// TODO: wire frequency of note to a tuning table
-				float freq = 440.0f * powf(2.0f, ((float)ev->data1 - 69.0f) / 12.0f);
-				vc->dcyc = 1.0f / ((float)ctx->samples_per_sec / freq);
+				vc->dcyc = calc_dcyc(ctx->samples_per_sec, ev->data1, chan->bend);
 				vc->down = true;
 				vc->released = false;
 				ctx->notecnt[ev->data1]++;
@@ -1938,7 +1942,14 @@ void nm_ctx_process(nm_ctx ctx, int sample_len, nm_sample samples){
 			// TODO: this
 		}
 		else if (ev->type == NM_EV_CHANBEND){
-			// TODO: this
+			nm_channel chan = &ctx->channels[ev->channel];
+			chan->bend = ev->u.data2f;
+			nm_voice vc = ctx->voices_used;
+			while (vc){
+				if (vc->channel == &ctx->channels[ev->channel])
+					vc->dcyc = calc_dcyc(ctx->samples_per_sec, vc->note, chan->bend);
+				vc = vc->next;
+			}
 		}
 		else if (ev->type == NM_EV_CHANVOL){
 			nm_channel chan = &ctx->channels[ev->channel];
