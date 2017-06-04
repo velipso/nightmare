@@ -858,20 +858,8 @@ bool nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_
 						}
 
 						int chan = msg & 0xF;
-						if (ctrl == 0x00){ // Bank Select MSB
-							int bank = ctrls[chan].bank;
-							if ((bank & 0x110000) == 0x110000) // if both set, clear LSB
-								ctrls[chan].bank = 0x100000 | (val << 8);
-							else // otherwise, add to LSB
-								ctrls[chan].bank = (bank & 0x0F00FF) | 0x100000 | (val << 8);
-						}
-						else if (ctrl == 0x20){ // Bank Select LSB
-							int bank = ctrls[chan].bank;
-							if ((bank & 0x110000) == 0x110000) // if both set, clear MSB
-								ctrls[chan].bank = 0x010000 | val;
-							else // otherwise, add to MSB
-								ctrls[chan].bank = (bank & 0xF0FF00) | 0x010000 | val;
-						}
+						if (ctrl == 0x00) // Bank Select MSB
+							ctrls[chan].bank = 0x100000 | (val << 8);
 						else if (ctrl == 0x06){ // RPN Data MSB
 							int rpn = ctrls[chan].rpn;
 							if ((rpn & 0x110000) == 0x110000 && rpn != 0x117F7F){
@@ -896,6 +884,8 @@ bool nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_
 							ctrls[chan].chexp_dirty = true;
 							ctrls[chan].chexp_ticks = ticks;
 						}
+						else if (ctrl == 0x20) // Bank Select LSB
+							ctrls[chan].bank = (ctrls[chan].bank & 0xF0FF00) | 0x010000 | val;
 						else if (ctrl == 0x26){ // RPN Data LSB
 							int rpn = ctrls[chan].rpn;
 							if ((rpn & 0x110000) == 0x110000 && rpn != 0x117F7F){
@@ -1038,13 +1028,9 @@ bool nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_
 						}
 						int chan = msg & 0xF;
 						int bank = ctrls[chan].bank;
-						if ((bank & 0x110000) != 0x110000){
+						if ((bank & 0x110000) != 0x110000)
 							warn(f_warn, user, "Incomplete bank in track %d", track_i);
-							bank = 0;
-						}
-						else
-							bank = bank & 0xFFFF;
-						nm_patch p = calc_patch(bank, patch);
+						nm_patch p = calc_patch(bank & 0xFFFF, patch);
 						if (p == NM__PATCH_END){
 							p = calc_patch(chan == 9 ? 0x7800 : 0x7900, patch);
 							if (p == NM__PATCH_END)
