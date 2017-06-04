@@ -1046,9 +1046,9 @@ bool nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_
 							bank = bank & 0xFFFF;
 						nm_patch p = calc_patch(bank, patch);
 						if (p == NM__PATCH_END){
-							p = calc_patch(0, patch);
+							p = calc_patch(chan == 9 ? 0x7800 : 0x7900, patch);
 							if (p == NM__PATCH_END)
-								p = NM_PIANO_ACGR;
+								p = chan == 9 ? NM_PERSND_STAN : NM_PIANO_ACGR;
 							warn(f_warn, user, "Unknown patch %02X (bank %04X), defaulting to "
 								"\"%s\", in track %d", patch, bank, nm_patch_str(p), track_i);
 						}
