@@ -293,6 +293,14 @@ static struct {
 	/* NM_SFX2_G7_EXPL  */ { 1.0f, 0.1f, 0.5f, 0.5f, 0.8f, 0.6f, 0.4f, 0.2f, 0 },
 };
 
+static inline float clampf(float v, float min, float max){
+	return v < min ? min : (v > max ? max : v);
+}
+
+static inline float squaref(float v){
+	return v * v;
+}
+
 static inline void recalc_spt(nm_ctx ctx){
 	// Variable:                     Units:
 	// ctx->samples_per_sec          samples/sec
@@ -343,6 +351,8 @@ nm_ctx nm_ctx_new(uint16_t ticks_per_quarternote, uint16_t channels, int voices,
 	if (ctx->events == NULL)
 		goto cleanup;
 
+	ctx->volume = 1;
+	ctx->pan = 0;
 	ctx->samples_per_sec = samples_per_sec;
 	ctx->ticks = 0;
 	ctx->last_bake_ticks = 0;
@@ -724,7 +734,7 @@ bool nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_
 						if (ctrls[chan].chvol_dirty && ticks != ctrls[chan].chvol_ticks){
 							int chvol = ctrls[chan].chvol;
 							chvol = ((chvol >> 1) & 0x3F80) | (chvol & 0x7F);
-							float vol = (float)chvol / 16383.0f;
+							float vol = (float)chvol / 16256.0f;
 							if (!nm_ev_chanvol(ctx, ctrls[chan].chvol_ticks, chan, vol))
 								return false;
 							ctrls[chan].chvol_dirty = false;
@@ -732,7 +742,7 @@ bool nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_
 						if (ctrls[chan].chexp_dirty && ticks != ctrls[chan].chexp_ticks){
 							int chexp = ctrls[chan].chexp;
 							chexp = ((chexp >> 1) & 0x3F80) | (chexp & 0x7F);
-							float exp = (float)chexp / 16383.0f;
+							float exp = (float)chexp / 16256.0f;
 							if (!nm_ev_chanvol(ctx, ctrls[chan].chexp_ticks, chan, exp))
 								return false;
 							ctrls[chan].chexp_dirty = false;
@@ -740,7 +750,7 @@ bool nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_
 						if (ctrls[chan].chpan_dirty && ticks != ctrls[chan].chpan_ticks){
 							int chpan = ctrls[chan].chpan;
 							chpan = ((chpan >> 1) & 0x3F80) | (chpan & 0x7F);
-							float pan = (float)chpan * 2.0f / 16383.0f - 1.0f;
+							float pan = (float)chpan * 2.0f / 16256.0f - 1.0f;
 							if (!nm_ev_chanpan(ctx, ctrls[chan].chexp_ticks, chan, pan))
 								return false;
 							ctrls[chan].chpan_dirty = false;
@@ -1047,7 +1057,8 @@ bool nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_
 							if (p == NM__PATCH_END)
 								p = chan == 9 ? NM_PERSND_STAN : NM_PIANO_ACGR;
 							warn(f_warn, user, "Unknown patch %02X (bank %04X), defaulting to "
-								"\"%s\", in track %d", patch, bank, nm_patch_str(p), track_i);
+								"\"%s\", in track %d", patch, bank & 0xFFFF, nm_patch_str(p),
+								track_i);
 						}
 						if (!nm_ev_patch(ctx, ticks, chan_base + chan, p))
 							return false;
@@ -1138,6 +1149,21 @@ bool nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_
 							warn(f_warn, user, "Bad SysEx Event (data length too large) in "
 								"track %d", track_i);
 							goto mtrk_end;
+						}
+						if (dl == 7 &&
+							data[p + 0] == 0x7F &&
+							data[p + 2] == 0x04 &&
+							data[p + 7] == 0xF7){ // SysEx Real Time Device Control
+							if (data[p + 3] == 0x01){ // Master Volume
+								int v = (((int)(data[p + 5] & 0x7F)) << 7) | (data[p + 4] & 0x7F);
+								if (!nm_ev_mastvol(ctx, ticks, (float)v / 16383.0f))
+									return false;
+							}
+							else if (data[p + 3] == 0x02){ // Master Balance
+								int v = (((int)(data[p + 5] & 0x7F)) << 7) | (data[p + 4] & 0x7F);
+								if (!nm_ev_mastpan(ctx, ticks, (float)v * 2.0f / 16383.0f - 1.0f))
+									return false;
+							}
 						}
 						/*
 						if (data[p] == 0x7E){
@@ -1441,6 +1467,26 @@ bool nm_ev_reset(nm_ctx ctx, uint32_t tick, uint16_t ticks_per_quarternote){
 	return true;
 }
 
+bool nm_ev_mastvol(nm_ctx ctx, uint32_t tick, float vol){
+	nm_wevent wev = nm_alloc(sizeof(nm_wevent_st));
+	if (wev == NULL)
+		return false;
+	wev->ev.type = NM_EV_MASTVOL;
+	wev->ev.u.data2f = clampf(vol, 0, 1);
+	wev_insert(ctx, tick, wev);
+	return true;
+}
+
+bool nm_ev_mastpan(nm_ctx ctx, uint32_t tick, float pan){
+	nm_wevent wev = nm_alloc(sizeof(nm_wevent_st));
+	if (wev == NULL)
+		return false;
+	wev->ev.type = NM_EV_MASTPAN;
+	wev->ev.u.data2f = clampf(pan, -1, 1);
+	wev_insert(ctx, tick, wev);
+	return true;
+}
+
 bool nm_ev_noteon(nm_ctx ctx, uint32_t tick, uint16_t channel, uint8_t note, float vel){
 	if (channel >= ctx->channel_count || note >= 0x80)
 		return false;
@@ -1450,7 +1496,7 @@ bool nm_ev_noteon(nm_ctx ctx, uint32_t tick, uint16_t channel, uint8_t note, flo
 	wev->ev.type = NM_EV_NOTEON;
 	wev->ev.channel = channel;
 	wev->ev.data1 = note;
-	wev->ev.u.data2f = vel;
+	wev->ev.u.data2f = clampf(vel, 0, 1);
 	wev_insert(ctx, tick, wev);
 	return true;
 }
@@ -1464,7 +1510,7 @@ bool nm_ev_notemod(nm_ctx ctx, uint32_t tick, uint16_t channel, uint8_t note, fl
 	wev->ev.type = NM_EV_NOTEMOD;
 	wev->ev.channel = channel;
 	wev->ev.data1 = note;
-	wev->ev.u.data2f = mod;
+	wev->ev.u.data2f = clampf(mod, 0, 1);
 	wev_insert(ctx, tick, wev);
 	return true;
 }
@@ -1490,7 +1536,7 @@ bool nm_ev_chanmod(nm_ctx ctx, uint32_t tick, uint16_t channel, float mod){
 		return false;
 	wev->ev.type = NM_EV_CHANMOD;
 	wev->ev.channel = channel;
-	wev->ev.u.data2f = mod;
+	wev->ev.u.data2f = clampf(mod, 0, 1);
 	wev_insert(ctx, tick, wev);
 	return true;
 }
@@ -1516,7 +1562,7 @@ bool nm_ev_chanvol(nm_ctx ctx, uint32_t tick, uint16_t channel, float volume){
 		return false;
 	wev->ev.type = NM_EV_CHANVOL;
 	wev->ev.channel = channel;
-	wev->ev.u.data2f = volume;
+	wev->ev.u.data2f = clampf(volume, 0, 1);
 	wev_insert(ctx, tick, wev);
 	return true;
 }
@@ -1529,7 +1575,7 @@ bool nm_ev_chanexp(nm_ctx ctx, uint32_t tick, uint16_t channel, float expression
 		return false;
 	wev->ev.type = NM_EV_CHANEXP;
 	wev->ev.channel = channel;
-	wev->ev.u.data2f = expression < 0 ? 0 : (expression > 1 ? 1 : expression);
+	wev->ev.u.data2f = clampf(expression, 0, 1);
 	wev_insert(ctx, tick, wev);
 	return true;
 }
@@ -1542,7 +1588,7 @@ bool nm_ev_chanpan(nm_ctx ctx, uint32_t tick, uint16_t channel, float pan){
 		return false;
 	wev->ev.type = NM_EV_CHANPAN;
 	wev->ev.channel = channel;
-	wev->ev.u.data2f = pan < -1 ? -1 : (pan > 1 ? 1 : pan);
+	wev->ev.u.data2f = clampf(pan, -1, 1);
 	wev_insert(ctx, tick, wev);
 	return true;
 }
@@ -1575,15 +1621,15 @@ bool nm_ev_patch(nm_ctx ctx, uint32_t tick, uint16_t channel, nm_patch patch){
 
 void nm_defpatch(nm_patch patch, uint8_t wave, float peak, float attack, float decay,
 	float sustain, float harmonic1, float harmonic2, float harmonic3, float harmonic4){
-	melodicpatch[patch].wave      = wave     ;
-	melodicpatch[patch].peak      = peak     ;
-	melodicpatch[patch].attack    = attack   ;
-	melodicpatch[patch].decay     = decay    ;
-	melodicpatch[patch].sustain   = sustain  ;
-	melodicpatch[patch].harmonic1 = harmonic1;
-	melodicpatch[patch].harmonic2 = harmonic2;
-	melodicpatch[patch].harmonic3 = harmonic3;
-	melodicpatch[patch].harmonic4 = harmonic4;
+	melodicpatch[patch].wave      = wave;
+	melodicpatch[patch].peak      = clampf(peak, 0, 1);
+	melodicpatch[patch].attack    = attack < 0 ? 0 : attack;
+	melodicpatch[patch].decay     = decay < 0 ? 0 : decay;
+	melodicpatch[patch].sustain   = clampf(sustain, 0, 1);
+	melodicpatch[patch].harmonic1 = clampf(harmonic1, 0, 1);
+	melodicpatch[patch].harmonic2 = clampf(harmonic2, 0, 1);
+	melodicpatch[patch].harmonic3 = clampf(harmonic3, 0, 1);
+	melodicpatch[patch].harmonic4 = clampf(harmonic4, 0, 1);
 }
 
 bool nm_ctx_bake(nm_ctx ctx, uint32_t ticks){
@@ -1720,6 +1766,10 @@ static inline float wave_harmonic(float i, float h1, float h2, float h3, float h
 static void render_sect(nm_ctx ctx, int len, nm_sample samples){
 	nm_voice vc = ctx->voices_used;
 	nm_voice *vc_prev = &ctx->voices_used;
+	float master_volume = squaref(ctx->volume);
+	float master_pan = ctx->pan;
+	float master_pan_L = cosf((master_pan + 1.0f) * M_PI * 0.25f);
+	float master_pan_R = sinf((master_pan + 1.0f) * M_PI * 0.25f);
 	while (vc){
 		bool keep;
 		if (vc->f_render)
@@ -1728,12 +1778,12 @@ static void render_sect(nm_ctx ctx, int len, nm_sample samples){
 			// default additive synthesizer
 			nm_defvoiceinf vi = vc->voiceinf;
 			nm_defpatchinf pi = vc->patchinf;
+			float vol = squaref(vc->channel->vol * vc->channel->exp);
+			float pan = vc->channel->pan;
+			float pan_L = master_volume * master_pan_L * cosf((pan + 1.0f) * M_PI * 0.25f);
+			float pan_R = master_volume * master_pan_R * sinf((pan + 1.0f) * M_PI * 0.25f);
 			if (pi->mel){
 				// melodic synthesis
-				float vol = vc->channel->vol * vc->channel->exp;
-				float pan = vc->channel->pan;
-				float pan_L = pan <= 0 ? 1 : 1 - pan;
-				float pan_R = pan >= 0 ? 1 : pan + 1;
 				float fade = vi->fade;
 				float dfade = vi->dfade;
 				float peak = pi->u.m.peak;
@@ -1774,7 +1824,7 @@ static void render_sect(nm_ctx ctx, int len, nm_sample samples){
 					float cyc = vc->cyc;
 					float dcyc = vc->dcyc;
 					for (int a = 0; a < len; a++){
-						float v = vol * fade * fade *
+						float v = vol * squaref(fade) *
 							wave_harmonic(fmodf(cyc + a * dcyc, 1.0f), h1, h2, h3, h4, f_wave);
 						if (dfade > 0){
 							fade += dfade;
@@ -1849,152 +1899,174 @@ void nm_ctx_process(nm_ctx ctx, int sample_len, nm_sample samples){
 		}
 
 		// process event
-		if (ev->type == NM_EV_NOP)
-			/* do nothing */;
-		else if (ev->type == NM_EV_RESET){
-			reset_tempo(ctx, ev->u.data2i);
-			// silent all voices
-			nm_voice vc = ctx->voices_used;
-			while (vc){
-				nm_voice next = vc->next;
-				vc->next = ctx->voices_free;
-				ctx->voices_free = vc;
-				vc = next;
-			}
-			ctx->voices_used = NULL;
-		}
-		else if (ev->type == NM_EV_NOTEON){
-			nm_voice vc = ctx->voices_free;
-			if (vc){
-				// allocate a voice by moving it from voices_free to voices_used
-				ctx->voices_free = vc->next;
-				vc->next = ctx->voices_used;
-				ctx->voices_used = vc;
+		switch (ev->type){
+			case NM_EV_NOP: {
+				// do nothing
+			} break;
 
-				// initialize voice
-				nm_channel chan = &ctx->channels[ev->channel];
-				nm_patch pt = chan->patch;
-				uint8_t pic = ctx->patchinf_custom[pt]; // 0 = unallocated/default, 1 = custom synth
+			case NM_EV_RESET: {
+				reset_tempo(ctx, ev->u.data2i);
+				// silent all voices
+				nm_voice vc = ctx->voices_used;
+				while (vc){
+					nm_voice next = vc->next;
+					vc->next = ctx->voices_free;
+					ctx->voices_free = vc;
+					vc = next;
+				}
+				ctx->voices_used = NULL;
+			} break;
 
-				if (pic == 0){
-					// attempt to allocate patch
-					if (ctx->f_patch_setup){
-						if (ctx->f_patch_setup(ctx, ctx->synth, pt, ctx->patchinf[pt]))
-							pic = 1;
-					}
+			case NM_EV_MASTVOL: {
+				ctx->volume = ev->u.data2f;
+			} break;
+
+			case NM_EV_MASTPAN: {
+				ctx->pan = ev->u.data2f;
+			} break;
+
+			case NM_EV_NOTEON: {
+				nm_voice vc = ctx->voices_free;
+				if (vc){
+					// allocate a voice by moving it from voices_free to voices_used
+					ctx->voices_free = vc->next;
+					vc->next = ctx->voices_used;
+					ctx->voices_used = vc;
+
+					// initialize voice
+					nm_channel chan = &ctx->channels[ev->channel];
+					nm_patch pt = chan->patch;
+					uint8_t pic = ctx->patchinf_custom[pt]; // 0 = unallocated/default, 1 = custom
+
 					if (pic == 0){
-						if (pt < NM_PERSND_STAN){
-							// intiailize patchinf to melodic synth info
-							nm_defpatchinf pi = ctx->patchinf[pt];
-							pi->mel = true;
-							pi->u.m.peak      = melodicpatch[pt].peak;
-							pi->u.m.attack    = melodicpatch[pt].attack;
-							pi->u.m.decay     = melodicpatch[pt].decay;
-							pi->u.m.sustain   = melodicpatch[pt].sustain;
-							pi->u.m.harmonic1 = melodicpatch[pt].harmonic1;
-							pi->u.m.harmonic2 = melodicpatch[pt].harmonic2;
-							pi->u.m.harmonic3 = melodicpatch[pt].harmonic3;
-							pi->u.m.harmonic4 = melodicpatch[pt].harmonic4;
-							if (melodicpatch[pt].wave == 0)
+						// attempt to allocate patch
+						if (ctx->f_patch_setup){
+							if (ctx->f_patch_setup(ctx, ctx->synth, pt, ctx->patchinf[pt]))
+								pic = 1;
+						}
+						if (pic == 0){
+							if (pt < NM_PERSND_STAN){
+								// intiailize patchinf to melodic synth info
+								nm_defpatchinf pi = ctx->patchinf[pt];
+								pi->mel = true;
+								pi->u.m.peak      = melodicpatch[pt].peak;
+								pi->u.m.attack    = melodicpatch[pt].attack;
+								pi->u.m.decay     = melodicpatch[pt].decay;
+								pi->u.m.sustain   = melodicpatch[pt].sustain;
+								pi->u.m.harmonic1 = melodicpatch[pt].harmonic1;
+								pi->u.m.harmonic2 = melodicpatch[pt].harmonic2;
+								pi->u.m.harmonic3 = melodicpatch[pt].harmonic3;
+								pi->u.m.harmonic4 = melodicpatch[pt].harmonic4;
+								if (melodicpatch[pt].wave == 0)
+									pi->u.m.f_wave = wave_sine;
+								else if (melodicpatch[pt].wave == 1)
+									pi->u.m.f_wave = wave_saw;
+								else if (melodicpatch[pt].wave == 2)
+									pi->u.m.f_wave = wave_square;
+								else
+									pi->u.m.f_wave = wave_triangle;
+							}
+							else{
+								// TODO: initialize patchinf to perc synth info
+								nm_defpatchinf pi = ctx->patchinf[pt];
+								pi->mel = true; // TODO: false
+								pi->u.m.peak      = 0;
+								pi->u.m.attack    = 0;
+								pi->u.m.decay     = 0;
+								pi->u.m.sustain   = 0;
+								pi->u.m.harmonic1 = 0;
+								pi->u.m.harmonic2 = 0;
+								pi->u.m.harmonic3 = 0;
+								pi->u.m.harmonic4 = 0;
 								pi->u.m.f_wave = wave_sine;
-							else if (melodicpatch[pt].wave == 1)
-								pi->u.m.f_wave = wave_saw;
-							else if (melodicpatch[pt].wave == 2)
-								pi->u.m.f_wave = wave_square;
-							else
-								pi->u.m.f_wave = wave_triangle;
+							}
 						}
-						else{
-							// TODO: initialize patchinf to perc synth info
-							nm_defpatchinf pi = ctx->patchinf[pt];
-							pi->mel = true; // TODO: false
-							pi->u.m.peak      = 0;
-							pi->u.m.attack    = 0;
-							pi->u.m.decay     = 0;
-							pi->u.m.sustain   = 0;
-							pi->u.m.harmonic1 = 0;
-							pi->u.m.harmonic2 = 0;
-							pi->u.m.harmonic3 = 0;
-							pi->u.m.harmonic4 = 0;
-							pi->u.m.f_wave = wave_sine;
-						}
+						ctx->patchinf_custom[pt] = pic;
 					}
-					ctx->patchinf_custom[pt] = pic;
-				}
 
-				vc->f_render = pic == 0 ? NULL : ctx->f_render;
-				vc->synth = ctx->synth;
-				vc->patchinf = ctx->patchinf[pt];
-				vc->patch = pt;
-				vc->note = ev->data1;
-				vc->channel = chan;
-				vc->samptot = 0;
-				vc->cyctot = 0;
-				vc->vel = ev->u.data2f;
-				vc->cyc = 0;
-				// TODO: wire frequency of note to a tuning table
-				vc->bend = chan->bend;
-				vc->dcyc = calc_dcyc(ctx->samples_per_sec, vc->note, vc->bend);
-				vc->down = true;
-				vc->released = false;
-				ctx->notecnt[ev->data1]++;
-			}
-		}
-		else if (ev->type == NM_EV_NOTEMOD){
-			// TODO: this
-		}
-		else if (ev->type == NM_EV_NOTEOFF){
-			// search for the right note/channel and turn it off
-			nm_voice vc = ctx->voices_used;
-			while (vc){
-				if (vc->channel == &ctx->channels[ev->channel] &&
-					vc->note == ev->data1 && vc->down){
-					vc->down = false;
-					vc->released = true;
-					ctx->notecnt[ev->data1]--;
-					break;
-				}
-				vc = vc->next;
-			}
-		}
-		else if (ev->type == NM_EV_CHANMOD){
-			nm_channel chan = &ctx->channels[ev->channel];
-			chan->mod = ev->u.data2f;
-		}
-		else if (ev->type == NM_EV_CHANBEND){
-			nm_channel chan = &ctx->channels[ev->channel];
-			chan->bend = ev->u.data2f;
-			nm_voice vc = ctx->voices_used;
-			while (vc){
-				if (vc->channel == &ctx->channels[ev->channel] &&
-					vc->patch == ctx->channels[ev->channel].patch){
+					vc->f_render = pic == 0 ? NULL : ctx->f_render;
+					vc->synth = ctx->synth;
+					vc->patchinf = ctx->patchinf[pt];
+					vc->patch = pt;
+					vc->note = ev->data1;
+					vc->channel = chan;
+					vc->samptot = 0;
+					vc->cyctot = 0;
+					vc->vel = ev->u.data2f;
+					vc->cyc = 0;
+					// TODO: wire frequency of note to a tuning table
 					vc->bend = chan->bend;
 					vc->dcyc = calc_dcyc(ctx->samples_per_sec, vc->note, vc->bend);
+					vc->down = true;
+					vc->released = false;
+					ctx->notecnt[ev->data1]++;
 				}
-				vc = vc->next;
-			}
-		}
-		else if (ev->type == NM_EV_CHANVOL){
-			nm_channel chan = &ctx->channels[ev->channel];
-			chan->vol = ev->u.data2f;
-		}
-		else if (ev->type == NM_EV_CHANEXP){
-			nm_channel chan = &ctx->channels[ev->channel];
-			chan->exp = ev->u.data2f;
-		}
-		else if (ev->type == NM_EV_CHANPAN){
-			nm_channel chan = &ctx->channels[ev->channel];
-			chan->pan = ev->u.data2f;
-		}
-		else if (ev->type == NM_EV_TEMPO){
-			ctx->ts_num = ev->channel;
-			ctx->ts_den = ev->data1;
-			ctx->tempo = ev->u.data2f;
-			recalc_spt(ctx);
-		}
-		else if (ev->type == NM_EV_PATCH){
-			nm_channel chan = &ctx->channels[ev->channel];
-			chan->patch = ev->u.data2i;
+			} break;
+
+			case NM_EV_NOTEMOD: {
+				// TODO: this
+			} break;
+
+			case NM_EV_NOTEOFF: {
+				// search for the right note/channel and turn it off
+				nm_voice vc = ctx->voices_used;
+				while (vc){
+					if (vc->channel == &ctx->channels[ev->channel] &&
+						vc->note == ev->data1 && vc->down){
+						vc->down = false;
+						vc->released = true;
+						ctx->notecnt[ev->data1]--;
+						break;
+					}
+					vc = vc->next;
+				}
+			} break;
+
+			case NM_EV_CHANMOD: {
+				nm_channel chan = &ctx->channels[ev->channel];
+				chan->mod = ev->u.data2f;
+			} break;
+
+			case NM_EV_CHANBEND: {
+				nm_channel chan = &ctx->channels[ev->channel];
+				chan->bend = ev->u.data2f;
+				nm_voice vc = ctx->voices_used;
+				while (vc){
+					if (vc->channel == &ctx->channels[ev->channel] &&
+						vc->patch == ctx->channels[ev->channel].patch){
+						vc->bend = chan->bend;
+						vc->dcyc = calc_dcyc(ctx->samples_per_sec, vc->note, vc->bend);
+					}
+					vc = vc->next;
+				}
+			} break;
+
+			case NM_EV_CHANVOL: {
+				nm_channel chan = &ctx->channels[ev->channel];
+				chan->vol = ev->u.data2f;
+			} break;
+
+			case NM_EV_CHANEXP: {
+				nm_channel chan = &ctx->channels[ev->channel];
+				chan->exp = ev->u.data2f;
+			} break;
+
+			case NM_EV_CHANPAN: {
+				nm_channel chan = &ctx->channels[ev->channel];
+				chan->pan = ev->u.data2f;
+			} break;
+
+			case NM_EV_TEMPO: {
+				ctx->ts_num = ev->channel;
+				ctx->ts_den = ev->data1;
+				ctx->tempo = ev->u.data2f;
+				recalc_spt(ctx);
+			} break;
+
+			case NM_EV_PATCH: {
+				nm_channel chan = &ctx->channels[ev->channel];
+				chan->patch = ev->u.data2i;
+			} break;
 		}
 
 		// advance read index

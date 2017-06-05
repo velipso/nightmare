@@ -50,12 +50,12 @@ for var m: range 4
 		var len = ci[2]
 
 		var bn = keyof + majorkey[base] - 24
-		noteplay t, len, bn
-		noteplay t, len, bn - 12
+		play t, len, bn
+		play t, len, bn - 12
 
 		for var ch: chord[1:]
 			var n = keyof + majorkey[ch + 7]
-			noteplay t + 6, 6, n
+			play t + 6, 6, n
 		end
 
 		t += len

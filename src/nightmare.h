@@ -71,6 +71,8 @@ nm_patchcat nm_patch_category(nm_patch p);
 const char *nm_patchcat_str(nm_patchcat pc);
 bool        nm_ev_nop(nm_ctx ctx, uint32_t tick);
 bool        nm_ev_reset(nm_ctx ctx, uint32_t tick, uint16_t ticks_per_quarternote);
+bool        nm_ev_mastvol(nm_ctx ctx, uint32_t tick, float vol);
+bool        nm_ev_mastpan(nm_ctx ctx, uint32_t tick, float pan);
 bool        nm_ev_noteon(nm_ctx ctx, uint32_t tick, uint16_t channel, uint8_t note, float vel);
 bool        nm_ev_notemod(nm_ctx ctx, uint32_t tick, uint16_t channel, uint8_t note, float mod);
 bool        nm_ev_noteoff(nm_ctx ctx, uint32_t tick, uint16_t channel, uint8_t note);
@@ -399,6 +401,8 @@ enum nm_patch_enum {
 enum nm_event_type_enum {
 	NM_EV_NOP,
 	NM_EV_RESET,
+	NM_EV_MASTVOL,
+	NM_EV_MASTPAN,
 	NM_EV_NOTEON,
 	NM_EV_NOTEMOD,
 	NM_EV_NOTEOFF,
@@ -495,6 +499,8 @@ struct nm_ctx_struct {
 	int ev_size;
 	int ev_read;
 	int ev_write;
+	float volume;
+	float pan;
 	float tempo;
 	uint8_t ts_num;
 	uint8_t ts_den;

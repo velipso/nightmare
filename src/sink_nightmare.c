@@ -50,6 +50,36 @@ static sink_val L_patchcat(sink_ctx ctx, int size, sink_val *args, nm_user u){
 	return SINK_NIL;
 }
 
+static sink_val L_mastervolume(sink_ctx ctx, int size, sink_val *args, nm_user u){
+	double ticks;
+	if (!sink_arg_num(ctx, size, args, 0, &ticks))
+		return SINK_NIL;
+	double vol;
+	if (!sink_arg_num(ctx, size, args, 1, &vol))
+		return SINK_NIL;
+	uint32_t t = (uint32_t)ticks;
+	if (t != ticks)
+		return sink_abortcstr(ctx, "Invalid ticks; expecting integer");
+	if (!nm_ev_mastvol(u->ctx, t, (float)vol))
+		return sink_abortcstr(ctx, "Failed to insert event");
+	return sink_bool(true);
+}
+
+static sink_val L_masterpan(sink_ctx ctx, int size, sink_val *args, nm_user u){
+	double ticks;
+	if (!sink_arg_num(ctx, size, args, 0, &ticks))
+		return SINK_NIL;
+	double pan;
+	if (!sink_arg_num(ctx, size, args, 1, &pan))
+		return SINK_NIL;
+	uint32_t t = (uint32_t)ticks;
+	if (t != ticks)
+		return sink_abortcstr(ctx, "Invalid ticks; expecting integer");
+	if (!nm_ev_mastpan(u->ctx, t, (float)pan))
+		return sink_abortcstr(ctx, "Failed to insert event");
+	return sink_bool(true);
+}
+
 typedef struct {
 	int note; // 0 to 11, -1 for unknown
 	int octave; // -1 to 9, -2 for unknown
@@ -243,8 +273,6 @@ static sink_val L_pan(sink_ctx ctx, int size, sink_val *args, nm_user u){
 	uint32_t t = (uint32_t)ticks;
 	if (t != ticks)
 		return sink_abortcstr(ctx, "Invalid ticks; expecting integer");
-	if (pan < -1 || pan > 1)
-		return sink_abortcstr(ctx, "Invalid pan; must be in range [-1, 1]");
 	if (!nm_ev_chanpan(u->ctx, t, u->channel, (float)pan))
 		return sink_abortcstr(ctx, "Failed to insert event");
 	return sink_bool(true);
@@ -271,7 +299,7 @@ static sink_val L_reset(sink_ctx ctx, int size, sink_val *args, nm_user u){
 	return sink_bool(true);
 }
 
-static sink_val L_noteplay(sink_ctx ctx, int size, sink_val *args, nm_user u){
+static sink_val L_play(sink_ctx ctx, int size, sink_val *args, nm_user u){
 	double ticks;
 	if (!sink_arg_num(ctx, size, args, 0, &ticks))
 		return SINK_NIL;
@@ -430,21 +458,23 @@ void sink_nightmare_scr(sink_scr scr){
 			"Gb8=0x72,G8=0x73,Gs8=0x74,Ab8=0x74,A8=0x75,As8=0x76,Bb8=0x76,B8=0x77,"
 			"C9=0x78,Cs9=0x79,Db9=0x79,D9=0x7A,Ds9=0x7B,Eb9=0x7B,E9=0x7C,F9=0x7D,Fs9=0x7E,"
 			"Gb9=0x7E,G9=0x7F;"
-		"declare patchname  'nightmare.patchname' ;"
-		"declare patchcat   'nightmare.patchcat'  ;"
-		"declare note       'nightmare.note'      ;"
-		"declare channel    'nightmare.channel'   ;"
-		"declare volume     'nightmare.volume'    ;"
-		"declare expression 'nightmare.expression';"
-		"declare pan        'nightmare.pan'       ;"
-		"declare reset      'nightmare.reset'     ;"
-		"declare noteplay   'nightmare.noteplay'  ;"
-		"declare bend       'nightmare.bend'      ;"
-		"declare tempo      'nightmare.tempo'     ;"
-		"declare patch      'nightmare.patch'     ;"
-		"declare defpatch   'nightmare.defpatch'  ;"
-		"declare bake       'nightmare.bake'      ;"
-		"declare bakeall    'nightmare.bakeall'   ;"
+		"declare patchname    'nightmare.patchname'   ;"
+		"declare patchcat     'nightmare.patchcat'    ;"
+		"declare mastervolume 'nightmare.mastervolume';"
+		"declare masterpan    'nightmare.masterpan'   ;"
+		"declare note         'nightmare.note'        ;"
+		"declare channel      'nightmare.channel'     ;"
+		"declare volume       'nightmare.volume'      ;"
+		"declare expression   'nightmare.expression'  ;"
+		"declare pan          'nightmare.pan'         ;"
+		"declare reset        'nightmare.reset'       ;"
+		"declare play         'nightmare.play'        ;"
+		"declare bend         'nightmare.bend'        ;"
+		"declare tempo        'nightmare.tempo'       ;"
+		"declare patch        'nightmare.patch'       ;"
+		"declare defpatch     'nightmare.defpatch'    ;"
+		"declare bake         'nightmare.bake'        ;"
+		"declare bakeall      'nightmare.bakeall'     ;"
 		"end"
 	);
 }
@@ -457,21 +487,23 @@ bool sink_nightmare_ctx(sink_ctx ctx, nm_ctx nctx){
 	u->ctx = nctx;
 	u->channel = 0;
 	u->tpq = nctx->ticks_per_quarternote;
-	sink_ctx_native(ctx, "nightmare.patchname" , u, (sink_native_func)L_patchname );
-	sink_ctx_native(ctx, "nightmare.patchcat"  , u, (sink_native_func)L_patchcat  );
-	sink_ctx_native(ctx, "nightmare.note"      , u, (sink_native_func)L_note      );
-	sink_ctx_native(ctx, "nightmare.channel"   , u, (sink_native_func)L_channel   );
-	sink_ctx_native(ctx, "nightmare.volume"    , u, (sink_native_func)L_volume    );
-	sink_ctx_native(ctx, "nightmare.expression", u, (sink_native_func)L_expression);
-	sink_ctx_native(ctx, "nightmare.pan"       , u, (sink_native_func)L_pan       );
-	sink_ctx_native(ctx, "nightmare.reset"     , u, (sink_native_func)L_reset     );
-	sink_ctx_native(ctx, "nightmare.noteplay"  , u, (sink_native_func)L_noteplay  );
-	sink_ctx_native(ctx, "nightmare.bend"      , u, (sink_native_func)L_bend      );
-	sink_ctx_native(ctx, "nightmare.tempo"     , u, (sink_native_func)L_tempo     );
-	sink_ctx_native(ctx, "nightmare.patch"     , u, (sink_native_func)L_patch     );
-	sink_ctx_native(ctx, "nightmare.defpatch"  , u, (sink_native_func)L_defpatch  );
-	sink_ctx_native(ctx, "nightmare.bake"      , u, (sink_native_func)L_bake      );
-	sink_ctx_native(ctx, "nightmare.bakeall"   , u, (sink_native_func)L_bakeall   );
-	sink_ctx_native(ctx, "nightmare.savemidi"  , u, (sink_native_func)L_savemidi  );
+	sink_ctx_native(ctx, "nightmare.patchname"   , u, (sink_native_func)L_patchname   );
+	sink_ctx_native(ctx, "nightmare.patchcat"    , u, (sink_native_func)L_patchcat    );
+	sink_ctx_native(ctx, "nightmare.mastervolume", u, (sink_native_func)L_mastervolume);
+	sink_ctx_native(ctx, "nightmare.masterpan"   , u, (sink_native_func)L_masterpan   );
+	sink_ctx_native(ctx, "nightmare.note"        , u, (sink_native_func)L_note        );
+	sink_ctx_native(ctx, "nightmare.channel"     , u, (sink_native_func)L_channel     );
+	sink_ctx_native(ctx, "nightmare.volume"      , u, (sink_native_func)L_volume      );
+	sink_ctx_native(ctx, "nightmare.expression"  , u, (sink_native_func)L_expression  );
+	sink_ctx_native(ctx, "nightmare.pan"         , u, (sink_native_func)L_pan         );
+	sink_ctx_native(ctx, "nightmare.reset"       , u, (sink_native_func)L_reset       );
+	sink_ctx_native(ctx, "nightmare.play"        , u, (sink_native_func)L_play        );
+	sink_ctx_native(ctx, "nightmare.bend"        , u, (sink_native_func)L_bend        );
+	sink_ctx_native(ctx, "nightmare.tempo"       , u, (sink_native_func)L_tempo       );
+	sink_ctx_native(ctx, "nightmare.patch"       , u, (sink_native_func)L_patch       );
+	sink_ctx_native(ctx, "nightmare.defpatch"    , u, (sink_native_func)L_defpatch    );
+	sink_ctx_native(ctx, "nightmare.bake"        , u, (sink_native_func)L_bake        );
+	sink_ctx_native(ctx, "nightmare.bakeall"     , u, (sink_native_func)L_bakeall     );
+	sink_ctx_native(ctx, "nightmare.savemidi"    , u, (sink_native_func)L_savemidi    );
 	return true;
 }

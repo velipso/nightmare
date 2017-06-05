@@ -497,6 +497,25 @@ command:
 | `02` | General MIDI Off  |
 | `03` | General MIDI 2 On |
 
+#### Master Volume SysEx
+
+```
+<DT> F0 07 7F TT 04 01 LL MM F7
+```
+
+Sets the Master Volume, where `TT` is the device target (usually `7F`), and `LL MM` is the value,
+where `LL` is the LSB (`00`-`7F`) and `MM` is the MSB (`00`-`7F`).
+
+#### Master Balance SysEx
+
+```
+<DT> F0 07 7F TT 04 02 LL MM F7
+```
+
+Sets the Master Balance, where `TT` is the device target (usually `7F`), and `LL MM` is the value,
+where `LL` is the LSB (`00`-`7F`) and `MM` is the MSB (`00`-`7F`).  Hard-left is `00 00` and
+hard-right is `7F 7F`.
+
 ### Meta Event
 
 Meta Events are always at least 3 bytes in length.

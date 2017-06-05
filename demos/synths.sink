@@ -24,6 +24,6 @@ for var l: range 100
 	reset 0, 1
 	tempo 0, 4, 4, 120
 	defpatch 0, wave, peak/10, attk/10, decy/10, sust/10, hrm1/10, hrm2/10, hrm3/10, hrm4/10
-	noteplay 0, 1, C4 + rand.int % 12
+	play 0, 1, C4 + rand.int % 12
 	bakeall
 end
