@@ -13,6 +13,8 @@ nm_alloc_func   nm_alloc   = malloc;
 nm_realloc_func nm_realloc = realloc;
 nm_free_func    nm_free    = free;
 
+static const float EPSf = 0.00001f; // epsilon
+
 //     |----| attack
 // ___
 //  |  |    ^
@@ -515,12 +517,11 @@ static inline const char *ss(int num){
 }
 
 static inline nm_patch calc_patch(int bank, int patch){
-	#define X(en, code, str)                                           \
-		if (((code & 0xF0000) >> 16) == 1 && /* melody instrument */   \
-			((code & 0x0FF00) >>  8) == patch && /* patch matches */   \
-			((bank & 0x0FF00) == 0x7900 || /* GM sound */              \
-			 (bank & 0x0FF00) == 0x0000) && /* default TODO: ? */      \
-			((code & 0x000FF)      ) == (bank & 0xFF)) /* bank LSB */  \
+	#define X(en, code, str)                                                       \
+		if (((code & 0x0FF00) >>  8) == patch && /* patch matches */               \
+			((code & 0x000FF)      ) == (bank & 0xFF) && ( /* bank LSB matches */  \
+				((code >> 16) == 1 && (bank & 0xFF00) == 0x7900) || /* melody */   \
+				((code >> 16) == 2 && (bank & 0xFF00) == 0x7800)))  /* perc */     \
 			return NM_ ## en;
 	NM_EACH_PATCH(X)
 	#undef X
@@ -543,6 +544,7 @@ bool nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_
 	uint16_t hd_ticks_per_q;
 	int track_count = 0;
 	int max_channels = 0;
+	int drums_def = -1;
 	int track_i = 0;
 	int running_status;
 	// timing info (ti) variables
@@ -639,7 +641,10 @@ bool nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_
 					ticks = 0;
 					chan_base = track_i * 16;
 				}
-				max_channels = chan_base + 16;
+				if (chan_base + 16 > max_channels){
+					max_channels = chan_base + 16;
+					drums_def = chan_base + 9; // channel 10 defaults to drums (only if used)
+				}
 				if (max_channels > ctx->channel_count){
 					warn(f_warn, user, "Too many simultaneous tracks, ignoring track %d", track_i);
 					goto mtrk_end;
@@ -760,6 +765,12 @@ bool nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_
 							msg = running_status;
 							p--;
 						}
+					}
+
+					// check for channel message on a drum channel
+					if (drums_def >= 0 && msg >= 0x80 && msg <= 0xEF && (msg & 0x0F) == 9){
+						nm_ev_patch(ctx, 0, drums_def, NM_PERSND_STAN);
+						drums_def = -1;
 					}
 
 					// interpret msg
@@ -1717,58 +1728,81 @@ static void render_sect(nm_ctx ctx, int len, nm_sample samples){
 			// default additive synthesizer
 			nm_defvoiceinf vi = vc->voiceinf;
 			nm_defpatchinf pi = vc->patchinf;
-			float vol = vc->channel->vol * vc->channel->exp;
-			float pan = vc->channel->pan;
-			float pan_L = pan <= 0 ? 1 : 1 - pan;
-			float pan_R = pan >= 0 ? 1 : pan + 1;
-			float fade = vi->fade;
-			float dfade = vi->dfade;
-			float peak = pi->peak;
-			float attack = pi->attack;
-			float decay = pi->decay;
-			float sustain = pi->sustain;
-			float h1 = pi->harmonic1;
-			float h2 = pi->harmonic2;
-			float h3 = pi->harmonic3;
-			float h4 = pi->harmonic4;
-			bool sustaining = vc->down;
-			float (*f_wave)(float i) = pi->f_wave;
-			if (vc->samptot == 0){
-				fade = 0;
-				dfade = 1.0f / (attack * ctx->samples_per_sec);
-				vi->dfade = dfade;
+			if (pi->perc){
+				// TODO: perc synthesis
 			}
-			if (vc->released){
-				dfade = -1.0f / (decay * ctx->samples_per_sec);
-				vi->dfade = dfade;
-			}
-			if (fade > 0 || dfade > 0){
-				float amp = vc->vel * peak;
-				sustain *= amp;
-				float cyc = vc->cyc;
-				float dcyc = vc->dcyc;
-				for (int a = 0; a < len; a++){
-					float v = vol * fade * fade *
-						wave_harmonic(fmodf(cyc + a * dcyc, 1.0f), h1, h2, h3, h4, f_wave);
-					if (dfade > 0){
-						fade += dfade;
-						if (fade >= amp){
-							fade = amp;
+			else{
+				// melodic synthesis
+				float vol = vc->channel->vol * vc->channel->exp;
+				float pan = vc->channel->pan;
+				float pan_L = pan <= 0 ? 1 : 1 - pan;
+				float pan_R = pan >= 0 ? 1 : pan + 1;
+				float fade = vi->fade;
+				float dfade = vi->dfade;
+				float peak = pi->u.m.peak;
+				float attack = pi->u.m.attack;
+				float decay = pi->u.m.decay;
+				float sustain = pi->u.m.sustain;
+				float h1 = pi->u.m.harmonic1;
+				float h2 = pi->u.m.harmonic2;
+				float h3 = pi->u.m.harmonic3;
+				float h4 = pi->u.m.harmonic4;
+				bool sustaining = vc->down;
+				float (*f_wave)(float i) = pi->u.m.f_wave;
+				if (vc->samptot == 0){
+					if (attack <= EPSf){
+						if (decay <= EPSf)
+							fade = dfade = 0;
+						else{
+							fade = peak;
 							dfade = -1.0f / (decay * ctx->samples_per_sec);
-							vi->dfade = dfade;
 						}
 					}
-					else if (fade > 0 && (!sustaining || fade > sustain)){
-						fade += dfade;
-						if (fade <= 0)
-							fade = 0;
+					else{
+						fade = 0;
+						dfade = 1.0f / (attack * ctx->samples_per_sec);
 					}
-					samples[a].L += pan_L * v;
-					samples[a].R += pan_R * v;
+					vi->dfade = dfade;
 				}
-				vi->fade = fade;
+				if (vc->released){
+					if (decay <= EPSf)
+						fade = dfade = 0;
+					else
+						dfade = -1.0f / (decay * ctx->samples_per_sec);
+					vi->dfade = dfade;
+				}
+				if (fade > 0 || dfade > 0){
+					float amp = vc->vel * peak;
+					sustain *= amp;
+					float cyc = vc->cyc;
+					float dcyc = vc->dcyc;
+					for (int a = 0; a < len; a++){
+						float v = vol * fade * fade *
+							wave_harmonic(fmodf(cyc + a * dcyc, 1.0f), h1, h2, h3, h4, f_wave);
+						if (dfade > 0){
+							fade += dfade;
+							if (fade >= amp){
+								if (decay <= EPSf)
+									fade = dfade = 0;
+								else{
+									fade = amp;
+									dfade = -1.0f / (decay * ctx->samples_per_sec);
+								}
+								vi->dfade = dfade;
+							}
+						}
+						else if (fade > 0 && (!sustaining || fade > sustain)){
+							fade += dfade;
+							if (fade <= 0)
+								fade = 0;
+						}
+						samples[a].L += pan_L * v;
+						samples[a].R += pan_R * v;
+					}
+					vi->fade = fade;
+				}
+				keep = fade > 0 || dfade > 0;
 			}
-			keep = fade > 0 || dfade > 0;
 		}
 		if (keep){
 			// advance vc stats
@@ -1782,6 +1816,8 @@ static void render_sect(nm_ctx ctx, int len, nm_sample samples){
 		}
 		else{
 			// move vc over to voices_free
+			if (vc->down)
+				ctx->notecnt[vc->note]--;
 			nm_voice vcn = vc->next;
 			vc->next = ctx->voices_free;
 			ctx->voices_free = vc;
@@ -1837,8 +1873,8 @@ void nm_ctx_process(nm_ctx ctx, int sample_len, nm_sample samples){
 				// initialize voice
 				nm_channel chan = &ctx->channels[ev->channel];
 				nm_patch pt = chan->patch;
-				uint8_t pic = ctx->patchinf_custom[pt];
-				// 0 = unallocated/default, 1 = custom synth
+				uint8_t pic = ctx->patchinf_custom[pt]; // 0 = unallocated/default, 1 = custom synth
+
 				if (pic == 0){
 					// attempt to allocate patch
 					if (ctx->f_patch_setup){
@@ -1846,27 +1882,45 @@ void nm_ctx_process(nm_ctx ctx, int sample_len, nm_sample samples){
 							pic = 1;
 					}
 					if (pic == 0){
-						// intiailize patchinf to default synth info
-						nm_defpatchinf pi = ctx->patchinf[pt];
-						pi->peak      = melodicpatch[pt].peak;
-						pi->attack    = melodicpatch[pt].attack;
-						pi->decay     = melodicpatch[pt].decay;
-						pi->sustain   = melodicpatch[pt].sustain;
-						pi->harmonic1 = melodicpatch[pt].harmonic1;
-						pi->harmonic2 = melodicpatch[pt].harmonic2;
-						pi->harmonic3 = melodicpatch[pt].harmonic3;
-						pi->harmonic4 = melodicpatch[pt].harmonic4;
-						if (melodicpatch[pt].wave == 0)
-							pi->f_wave = wave_sine;
-						else if (melodicpatch[pt].wave == 1)
-							pi->f_wave = wave_saw;
-						else if (melodicpatch[pt].wave == 2)
-							pi->f_wave = wave_square;
-						else
-							pi->f_wave = wave_triangle;
+						if (pt < NM_PERSND_STAN){
+							// intiailize patchinf to melodic synth info
+							nm_defpatchinf pi = ctx->patchinf[pt];
+							pi->perc = false;
+							pi->u.m.peak      = melodicpatch[pt].peak;
+							pi->u.m.attack    = melodicpatch[pt].attack;
+							pi->u.m.decay     = melodicpatch[pt].decay;
+							pi->u.m.sustain   = melodicpatch[pt].sustain;
+							pi->u.m.harmonic1 = melodicpatch[pt].harmonic1;
+							pi->u.m.harmonic2 = melodicpatch[pt].harmonic2;
+							pi->u.m.harmonic3 = melodicpatch[pt].harmonic3;
+							pi->u.m.harmonic4 = melodicpatch[pt].harmonic4;
+							if (melodicpatch[pt].wave == 0)
+								pi->u.m.f_wave = wave_sine;
+							else if (melodicpatch[pt].wave == 1)
+								pi->u.m.f_wave = wave_saw;
+							else if (melodicpatch[pt].wave == 2)
+								pi->u.m.f_wave = wave_square;
+							else
+								pi->u.m.f_wave = wave_triangle;
+						}
+						else{
+							// TODO: initialize patchinf to perc synth info
+							nm_defpatchinf pi = ctx->patchinf[pt];
+							pi->perc = false; // TODO: true
+							pi->u.m.peak      = 0;
+							pi->u.m.attack    = 0;
+							pi->u.m.decay     = 0;
+							pi->u.m.sustain   = 0;
+							pi->u.m.harmonic1 = 0;
+							pi->u.m.harmonic2 = 0;
+							pi->u.m.harmonic3 = 0;
+							pi->u.m.harmonic4 = 0;
+							pi->u.m.f_wave = wave_sine;
+						}
 					}
 					ctx->patchinf_custom[pt] = pic;
 				}
+
 				vc->f_render = pic == 0 ? NULL : ctx->f_render;
 				vc->synth = ctx->synth;
 				vc->patchinf = ctx->patchinf[pt];

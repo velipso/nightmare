@@ -432,15 +432,23 @@ struct nm_wevent_struct {
 };
 
 struct nm_defpatchinf_struct {
-	float peak;
-	float attack;
-	float decay;
-	float sustain;
-	float harmonic1;
-	float harmonic2;
-	float harmonic3;
-	float harmonic4;
-	float (*f_wave)(float i);
+	bool perc;
+	union {
+		struct {
+			float peak;
+			float attack;
+			float decay;
+			float sustain;
+			float harmonic1;
+			float harmonic2;
+			float harmonic3;
+			float harmonic4;
+			float (*f_wave)(float i);
+		} m;
+		struct {
+			// TODO: perc info
+		} p;
+	} u;
 };
 
 struct nm_defvoiceinf_struct {
