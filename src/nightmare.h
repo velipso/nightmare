@@ -432,7 +432,7 @@ struct nm_wevent_struct {
 };
 
 struct nm_defpatchinf_struct {
-	bool perc;
+	bool mel;
 	union {
 		struct {
 			float peak;

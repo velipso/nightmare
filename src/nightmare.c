@@ -1728,10 +1728,7 @@ static void render_sect(nm_ctx ctx, int len, nm_sample samples){
 			// default additive synthesizer
 			nm_defvoiceinf vi = vc->voiceinf;
 			nm_defpatchinf pi = vc->patchinf;
-			if (pi->perc){
-				// TODO: perc synthesis
-			}
-			else{
+			if (pi->mel){
 				// melodic synthesis
 				float vol = vc->channel->vol * vc->channel->exp;
 				float pan = vc->channel->pan;
@@ -1802,6 +1799,10 @@ static void render_sect(nm_ctx ctx, int len, nm_sample samples){
 					vi->fade = fade;
 				}
 				keep = fade > 0 || dfade > 0;
+			}
+			else{
+				// TODO: perc synthesis
+				keep = false;
 			}
 		}
 		if (keep){
@@ -1885,7 +1886,7 @@ void nm_ctx_process(nm_ctx ctx, int sample_len, nm_sample samples){
 						if (pt < NM_PERSND_STAN){
 							// intiailize patchinf to melodic synth info
 							nm_defpatchinf pi = ctx->patchinf[pt];
-							pi->perc = false;
+							pi->mel = true;
 							pi->u.m.peak      = melodicpatch[pt].peak;
 							pi->u.m.attack    = melodicpatch[pt].attack;
 							pi->u.m.decay     = melodicpatch[pt].decay;
@@ -1906,7 +1907,7 @@ void nm_ctx_process(nm_ctx ctx, int sample_len, nm_sample samples){
 						else{
 							// TODO: initialize patchinf to perc synth info
 							nm_defpatchinf pi = ctx->patchinf[pt];
-							pi->perc = false; // TODO: true
+							pi->mel = true; // TODO: false
 							pi->u.m.peak      = 0;
 							pi->u.m.attack    = 0;
 							pi->u.m.decay     = 0;
