@@ -363,7 +363,7 @@ nm_ctx nm_ctx_new(uint16_t ticks_per_quarternote, uint16_t channels, int voices,
 	if (ctx->channels == NULL)
 		goto cleanup;
 	for (int i = 0; i < channels; i++){
-		ctx->channels[i].patch = NM_PIANO_ACGR; // TODO: what is proper intialization?
+		ctx->channels[i].patch = NM_PIANO_ACGR;
 		ctx->channels[i].vol = 100.0f / 127.0f;
 		ctx->channels[i].exp = 1.0f;
 		ctx->channels[i].pan = 0;
@@ -667,7 +667,7 @@ bool nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_
 					bool nrpn;            // = true if .rpn is an NRPN, false if .rpn is an RPN
 					int pitch_bend_range; // =   0x0200 = 2 semitones = +-1 semitones
 					bool chvol_dirty;     // = true if chvol has been set to something
-					int chvol;            // =   0x4000 = 0.5 linear (TODO: I suppose)
+					int chvol;            // =   0x6400 = 100 / 127
 					uint32_t chvol_ticks; // = when the chvol was set
 					bool chexp_dirty;
 					int chexp;
@@ -676,22 +676,22 @@ bool nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_
 					int chpan;
 					uint32_t chpan_ticks;
 				} ctrls[16] = {
-					{ 0x117900, 0x117F7F, 0, 0x0200, 0, 0x4000, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
-					{ 0x117900, 0x117F7F, 0, 0x0200, 0, 0x4000, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
-					{ 0x117900, 0x117F7F, 0, 0x0200, 0, 0x4000, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
-					{ 0x117900, 0x117F7F, 0, 0x0200, 0, 0x4000, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
-					{ 0x117900, 0x117F7F, 0, 0x0200, 0, 0x4000, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
-					{ 0x117900, 0x117F7F, 0, 0x0200, 0, 0x4000, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
-					{ 0x117900, 0x117F7F, 0, 0x0200, 0, 0x4000, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
-					{ 0x117900, 0x117F7F, 0, 0x0200, 0, 0x4000, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
-					{ 0x117900, 0x117F7F, 0, 0x0200, 0, 0x4000, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
-					{ 0x117800, 0x117F7F, 0, 0x0200, 0, 0x4000, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
-					{ 0x117900, 0x117F7F, 0, 0x0200, 0, 0x4000, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
-					{ 0x117900, 0x117F7F, 0, 0x0200, 0, 0x4000, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
-					{ 0x117900, 0x117F7F, 0, 0x0200, 0, 0x4000, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
-					{ 0x117900, 0x117F7F, 0, 0x0200, 0, 0x4000, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
-					{ 0x117900, 0x117F7F, 0, 0x0200, 0, 0x4000, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
-					{ 0x117900, 0x117F7F, 0, 0x0200, 0, 0x4000, 0, 0, 0x7F00, 0, 0, 0x4000, 0 }
+					{ 0x117900, 0x117F7F, 0, 0x0200, 0, 0x6400, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
+					{ 0x117900, 0x117F7F, 0, 0x0200, 0, 0x6400, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
+					{ 0x117900, 0x117F7F, 0, 0x0200, 0, 0x6400, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
+					{ 0x117900, 0x117F7F, 0, 0x0200, 0, 0x6400, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
+					{ 0x117900, 0x117F7F, 0, 0x0200, 0, 0x6400, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
+					{ 0x117900, 0x117F7F, 0, 0x0200, 0, 0x6400, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
+					{ 0x117900, 0x117F7F, 0, 0x0200, 0, 0x6400, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
+					{ 0x117900, 0x117F7F, 0, 0x0200, 0, 0x6400, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
+					{ 0x117900, 0x117F7F, 0, 0x0200, 0, 0x6400, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
+					{ 0x117800, 0x117F7F, 0, 0x0200, 0, 0x6400, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
+					{ 0x117900, 0x117F7F, 0, 0x0200, 0, 0x6400, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
+					{ 0x117900, 0x117F7F, 0, 0x0200, 0, 0x6400, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
+					{ 0x117900, 0x117F7F, 0, 0x0200, 0, 0x6400, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
+					{ 0x117900, 0x117F7F, 0, 0x0200, 0, 0x6400, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
+					{ 0x117900, 0x117F7F, 0, 0x0200, 0, 0x6400, 0, 0, 0x7F00, 0, 0, 0x4000, 0 },
+					{ 0x117900, 0x117F7F, 0, 0x0200, 0, 0x6400, 0, 0, 0x7F00, 0, 0, 0x4000, 0 }
 				};
 				running_status = -1;
 				uint64_t p = chk.data_start;
@@ -750,7 +750,11 @@ bool nm_midi_newbuffer(nm_ctx ctx, uint64_t size, uint8_t *data, nm_warn_func f_
 						if (ctrls[chan].chpan_dirty && ticks != ctrls[chan].chpan_ticks){
 							int chpan = ctrls[chan].chpan;
 							chpan = ((chpan >> 1) & 0x3F80) | (chpan & 0x7F);
-							float pan = (float)chpan * 2.0f / 16256.0f - 1.0f;
+							float pan;
+							if (chpan < 0x2000)
+								pan = (float)chpan / 8192.0f - 1.0f;
+							else
+								pan = (float)(chpan - 0x2000) / 8064.0f;
 							if (!nm_ev_chanpan(ctx, ctrls[chan].chexp_ticks, chan, pan))
 								return false;
 							ctrls[chan].chpan_dirty = false;
