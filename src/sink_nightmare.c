@@ -221,7 +221,7 @@ static sink_val L_note(sink_ctx ctx, int size, sink_val *args, nm_user u){
 static sink_val L_channel(sink_ctx ctx, int size, sink_val *args, nm_user u){
 	if (size >= 1){
 		double chan;
-		if (!sink_arg_num(ctx, size, args, 1, &chan))
+		if (!sink_arg_num(ctx, size, args, 0, &chan))
 			return SINK_NIL;
 		uint16_t c = (uint16_t)chan;
 		if (c != chan || c >= u->ctx->channel_count)
@@ -310,7 +310,7 @@ static sink_val L_play(sink_ctx ctx, int size, sink_val *args, nm_user u){
 	if (!sink_arg_num(ctx, size, args, 2, &note))
 		return SINK_NIL;
 	double vel = 1;
-	if (size >= 4 && !sink_arg_num(ctx, size, args, 3, &vel))
+	if (size >= 4 && !sink_isnil(args[3]) && !sink_arg_num(ctx, size, args, 3, &vel))
 		return SINK_NIL;
 	uint32_t t = (uint32_t)ticks;
 	uint32_t d = (uint32_t)duration;

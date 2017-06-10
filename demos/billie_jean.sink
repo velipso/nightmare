@@ -1,0 +1,130 @@
+
+include 'nightmare' # required
+using music
+
+include './chords'  # get chord info
+
+say 'Billie Jean by Michael Jackson'
+say '(transcribed by @voidqk)'
+
+reset 0, 16
+tempo 0, 4, 4, 113
+
+# prechorus piano on channel/patch 2
+defpatch 2, 0, 1, 0.1, 1.0, 0.4, 0.5, 0.2, 0.1, 0
+channel 2
+patch 0, 2
+
+# strings on channel/patch 3
+defpatch 3, 0, 1, 0.1, 0.3, 0, 0.6, 0.4, 0.2, 0
+channel 3
+patch 0, 3
+
+var DWd = 96  # dotted wholenote
+var DW  = 64  # wholenote
+var DHd = 48  # dotted halfnote
+var DH  = 32  # halfnote
+var DQd = 24  # dotted quarternote
+var DQ  = 16  # quarternote
+var DEd = 12  # dotted eighthnote
+var DE  =  8  # eighthnote
+var DSd =  6  # dotted sixteenthnote
+var DS  =  4  # sixteenthnote
+
+var T = 0
+
+def strings7
+	var ch = channel
+	channel 3
+	chord T, DQd, E4 , Xm     ;                  ; T += DQd
+	chord T, DE , Fs4, Xm     ; slash T, DE , E4 ; T += DE
+	/* rest */                ;                  ; T += DH
+	chord T, DQd, E4 , Xm7    ;                  ; T += DQd
+	chord T, DE , Fs4, Xm     ; slash T, DE , E4 ; T += DE
+	/* rest */                ;                  ; T += DH
+	channel ch
+end
+
+def strings7_2
+	var ch = channel
+	channel 3
+	chord T, DQd, A3 , Xm     ;                  ; T += DQd
+	chord T, DE , A3 , Xm     ;                  ; T += DE
+	/* rest */                ;                  ; T += DH
+	chord T, DQd, A3 , Xm     ;                  ; T += DQd
+	chord T, DE , A3 , Xm     ;                  ; T += DE
+	/* rest */                ;                  ; T += DH
+	channel ch
+end
+
+def prechorus1
+	var ch = channel
+	channel 2
+	chord T, DW, C4, X  ; T += DW
+	chord T, DW, E4, Xm ; T += DW
+	channel ch
+end
+
+def prechorus2
+	var ch = channel
+	channel 2
+	chord T, DW, C4, X  ; T += DW
+	chord T, DW, B3, X  ; T += DW
+	channel ch
+end
+
+# intro
+strings7        # <silent>
+# first verse
+strings7        # She was more like a beauty queen from a movie scene
+strings7        # I said don't mind, but what do you mean I am the
+strings7_2      # one who will dance on the floor in the round?
+strings7        # <silent> She said I am the
+strings7_2      # one who will dance on the floor in the round.
+strings7        # <silent>
+# second verse
+strings7        # She told me her name was Billie Jean as she caused a scene.
+strings7        # Then every head turned with eyes that dreamed of being the
+strings7_2      # one who will dance on the floor in the round.
+strings7        # <silent>
+# pre-chorus
+prechorus1      # People always told me, be careful what you do.
+prechorus1      # Don't go around breaking young girls' hearts
+prechorus1      # And mother always told me, be careful who you love.
+prechorus2      # Be careful of what you do 'cause the lie becomes the truth, hey
+# chorus
+strings7        # Billie Jean is not my lover
+strings7        # She's just a girl who claims that I am the
+strings7_2      # one, but the kid is not my son
+strings7        # She says I am the
+strings7_2      # one, but the kid is not my son
+strings7        # <silent>
+# third verse   #
+strings7        # For forty days and for forty nights, law was on her side
+strings7        # But who can stand when she's in demand, her schemes and
+strings7_2      # plans, cause we danced on the floor in the round
+strings7        # <silent> So take my strong
+strings7_2      # advice just remember to always think twice
+strings7        # <silent>
+# fourth verse
+strings7        # She told my baby we'd danced till three; and she looked at me
+strings7        # then showed a photo a baby cries, his eyes were like
+strings7_2      # mine.  Can we dance on the floor in the round?
+strings7        # <silent>
+# pre-chorus
+prechorus1      # People always told me, be careful what you do.
+prechorus1      # Don't go around breaking young girls' hearts
+prechorus1      # But you came and stood right by me, just a smell of sweet perfume
+prechorus2      # This happened much too soon, she called me to her room, hey
+# chorus
+strings7        # Billie Jean is not my lover
+strings7        # She's just a girl who claims that I am the
+strings7_2      # one, but the kid is not my son
+strings7        # She says I am the
+strings7_2      # one, but the kid is not my son
+strings7        # <silent>
+strings7_2      # But the kid is not my son
+strings7
+strings7
+
+bakeall
