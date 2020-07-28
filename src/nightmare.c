@@ -7,16 +7,57 @@
 #include <string.h>
 #include <opusfile.h>
 
-nm_malloc_f  nm_malloc  = malloc;
-nm_realloc_f nm_realloc = realloc;
-nm_free_f    nm_free    = free;
-
 static const float TAU = 6.283185307179586476925286766559005768394338798750211641949f;
-static const int K_BLOCK_SIZE = 200;
+
+typedef void (*build_f)(
+	void *cu, // clip data
+	float out,
+	float x,
+	float y
+);
+typedef bool (*render_f)(
+	nm_sample_st *buf,
+	void *vu, // voice data
+	void *cu, // clip data
+	float volume,
+	float dvolume,
+	float x,
+	float dx,
+	float y,
+	float dy
+);
+typedef void (*poly_noteon_f)();
+typedef void (*poly_noteoff_f)();
+typedef void (*mono_noteon_f)();
+typedef void (*mono_notepush_f)();
+typedef void (*mono_notepop_f)();
+typedef void (*mono_noteoff_f)();
+typedef void (*sample_noteon_f)();
+typedef void (*sample_noteoff_f)();
 
 typedef struct {
-	size_t vuser_size;
-	size_t buser_size;
+	#ifndef NDEBUG
+	size_t vdata_size;
+	size_t cdata_size;
+	#endif
+	build_f f_build;
+	render_f f_render;
+	union {
+		struct {
+			poly_noteon_f f_noteon;
+			poly_noteoff_f f_noteoff;
+		} poly;
+		struct {
+			mono_noteon_f f_noteon;
+			mono_notepush_f f_notepush;
+			mono_notepop_f f_notepop;
+			mono_noteoff_f f_noteoff;
+		} mono;
+		struct {
+			sample_noteon_f f_noteon;
+			sample_noteoff_f f_noteoff;
+		} sample;
+	} f;
 	nm_voice_st voice;
 } vabout_st;
 
@@ -179,7 +220,7 @@ static inline void biquad_peaking(biquad_st *bq, float freq, float Q, float gain
 	else if (Q <= 0.0f)
 		biquad_scale(bq, A * A); // scale by A squared
 	else{
-		float w0    = (float)M_PI * 2.0f * freq;
+		float w0    = TAU * freq;
 		float alpha = sinf(w0) / (2.0f * Q);
 		float k     = cosf(w0);
 		float a0inv = 1.0f / (1.0f + alpha / A);
@@ -376,6 +417,67 @@ static inline bool envelope_done(envelope_st *env){
 // VOICES
 //
 
+#ifndef NDEBUG
+#define VABOUT_SIZES()                                                 \
+		.vdata_size = sizeof(NAME(vst)),                               \
+		.cdata_size = sizeof(NAME(cst)),
+#else
+#define VABOUT_SIZES()
+#endif
+
+#define VABOUT_POLY(id, vc, na, xl, xd, yl, yd)                        \
+	static const vabout_st NAME(about) = {                             \
+		VABOUT_SIZES()                                                 \
+		.f_build = (build_f)NAME(poly_build),                          \
+		.f_render = (render_f)NAME(poly_render),                       \
+		.f.poly.f_noteon = (poly_noteon_f)NAME(poly_noteon),           \
+		.f.poly.f_noteoff = (poly_noteoff_f)NAME(poly_noteoff),        \
+		.voice = {                                                     \
+			.voice_id = id,                                            \
+			.vtype = NM_VT_POLY,                                       \
+			.vcat = vc,                                                \
+			.name = na,                                                \
+			.xlabel = xl, .x = xd,                                     \
+			.ylabel = yl, .y = yd                                      \
+		}                                                              \
+	}
+
+#define VABOUT_MONO(id, vc, na, xl, xd, yl, yd)                        \
+	static const vabout_st NAME(about) = {                             \
+		VABOUT_SIZES()                                                 \
+		.f_build = (build_f)NAME(mono_build),                          \
+		.f_render = (render_f)NAME(mono_render),                       \
+		.f.mono.f_noteon = (mono_noteon_f)NAME(mono_noteon),           \
+		.f.mono.f_notepush = (mono_notepush_f)NAME(mono_notepush),     \
+		.f.mono.f_notepop = (mono_notepop_f)NAME(mono_notepop),        \
+		.f.mono.f_noteoff = (mono_noteoff_f)NAME(mono_noteoff),        \
+		.voice = {                                                     \
+			.voice_id = id,                                            \
+			.vtype = NM_VT_MONO,                                       \
+			.vcat = vc,                                                \
+			.name = na,                                                \
+			.xlabel = xl, .x = xd,                                     \
+			.ylabel = yl, .y = yd                                      \
+		}                                                              \
+	}
+
+#define VABOUT_SAMPLE(id, vc, na, xl, xd, yl, yd)                      \
+	static const vabout_st NAME(about) = {                             \
+		VABOUT_SIZES()                                                 \
+		.f_build = (build_f)NAME(sample_build),                        \
+		.f_render = (render_f)NAME(sample_render),                     \
+		.f.sample.f_noteon = (sample_noteon_f)NAME(sample_noteon),     \
+		.f.sample.f_noteoff = (sample_noteoff_f)NAME(sample_noteoff),  \
+		.voice = {                                                     \
+			.voice_id = id,                                            \
+			.vtype = NM_VT_SAMPLE,                                     \
+			.vcat = vc,                                                \
+			.name = na,                                                \
+			.xlabel = xl, .x = xd,                                     \
+			.ylabel = yl, .y = yd                                      \
+		}                                                              \
+	}
+
 #include "voice/1001_square.c"
 #include "voice/1002_saw.c"
 
@@ -396,20 +498,65 @@ void nm_init(){
 
 	#ifndef NDEBUG
 	// TODO: validate voices are sorted
-	// TODO: validate no voices surpass vuser's size
-	// TODO: validate no voices surpass buser's size
+	// TODO: validate no voices surpass vdata's size
+	// TODO: validate no voices surpass cdata's size
 	#endif
 }
 
-void nm_ctx_make(nm_ctx_st *nm){
+void nm_clear(nm_ctx_st *nm){
+	memset(nm, 0, sizeof(nm_ctx_st));
+	nm->tempo = 30; // 120bpm
 }
 
-void nm_ctx_destroy(nm_ctx_st *nm){
+static inline void renderblock(nm_ctx_st *nm, nm_sample_st *out){
+	// render a block to out (200 samples, NM_K)
+
+	// TODO: render to channels, volume, panning, reverb send
+
+	for (int i = 0; i < 64; i++){
+		if (!nm->avoices[i].aid)
+			continue;
+		vabout_st *about = (vabout_st *)nm->avoices[i].about;
+		if (!about->f_render(
+			out,
+			nm->avoices[i].vdata,
+			nm->clips[nm->avoices[i].clip_id].cdata,
+			0.5f, 0.0f, // TODO: these
+			0.5f, 0.0f,
+			0.5f, 0.0f
+		))
+			nm->avoices[i].aid = 0;
+	}
 }
 
-void nm_ctx_render(nm_ctx_st *nm, nm_sample_st *out, size_t outsize){
-}
+void nm_render(nm_ctx_st *nm, nm_sample_st *out, size_t outsize){
+	// the engine renders in blocks of size 200 samples (NM_K)
+	// therefore, we need to buffer the last block to account for misaligned renders
 
-void nm_term(){
-	// TODO: unload samples
+	// check for a buffered block, which should be output first before rendering more
+	int s = nm->kbuf_size;
+	if (nm->kbuf_size > 0){
+		// we can't just memcpy because we need to add to out
+		for (int i = 0; i < nm->kbuf_size; i++){
+			out[i].L += nm->kbuf[i].L;
+			out[i].R += nm->kbuf[i].R;
+		}
+		nm->kbuf_size = 0;
+	}
+
+	// render out!
+	size_t bcount = (outsize - s) / NM_K;
+	for (size_t b = 0; b < bcount; b++, s += NM_K)
+		renderblock(nm, &out[s]);
+
+	// check if we need a partial block, and if so, render a full block to the kbuf
+	int tail = outsize - s;
+	if (tail > 0){
+		nm->kbuf_size = NM_K - tail;
+		memcpy(nm->kbuf, &out[s], sizeof(nm_sample_st) * tail);
+		memset(&nm->kbuf[tail], 0, sizeof(nm_sample_st) * nm->kbuf_size);
+		renderblock(nm, nm->kbuf);
+		memcpy(&out[s], nm->kbuf, sizeof(nm_sample_st) * tail);
+		memmove(nm->kbuf, &nm->kbuf[tail], sizeof(nm_sample_st) * nm->kbuf_size);
+	}
 }

@@ -15,18 +15,13 @@
 
 #include "../synth/osc.c"
 
-static const vabout_st NAME(about) = {
-	.vuser_size = sizeof(NAME(vst)),
-	.buser_size = sizeof(NAME(bst)),
-	.voice = {
-		.voice_id = 1002,
-		.vtype = NM_VT_OSC,
-		.vcat = NM_VC_PAD,
-		.name = "Saw",
-		.xlabel = "Test X", .x = 50,
-		.ylabel = "Test Y", .y = 50
-	}
-};
+VABOUT_POLY(
+	1002,
+	NM_VC_PAD,
+	"Saw",
+	"Test X:", 50,
+	"Test Y:", 50
+);
 
 #undef DUTY
 #undef OVERSAMPLE

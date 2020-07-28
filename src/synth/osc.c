@@ -35,10 +35,18 @@ typedef struct {
 // data per clip
 typedef struct {
 	int dummy;
-} NAME(bst);
+} NAME(cst);
 
-void NAME(noteon)(
-	NAME(vst) *vu, NAME(bst) *bu,
+static void NAME(poly_build)(
+	NAME(cst) *cu,
+	float out,
+	float x,
+	float y
+){
+}
+
+static void NAME(poly_noteon)(
+	NAME(vst) *vu, NAME(cst) *cu,
 	int note,
 	float freq,
 	float velocity,
@@ -58,9 +66,9 @@ void NAME(noteon)(
 	vu->notes[vu->nextnote++] = (NAME(note_st)){ note, freq / 48000.0f };
 }
 
-bool NAME(render)(
+static bool NAME(poly_render)(
 	nm_sample_st *buf,
-	NAME(vst) *vu, NAME(bst) *bu,
+	NAME(vst) *vu, NAME(cst) *cu,
 	float volume, float dvolume,
 	float x, float dx,
 	float y, float dy
@@ -71,8 +79,8 @@ bool NAME(render)(
 	for (int u = 1; u < UNISON; u++)
 		dang[u] = dang[0] * UNISON_DETUNE(u);
 	if (!on)
-		dvolume = -volume / K_BLOCK_SIZE;
-	for (int i = 0; i < K_BLOCK_SIZE; i++){
+		dvolume = -volume / NM_K;
+	for (int i = 0; i < NM_K; i++){
 		float s = 0;
 		float env = envelope_step(&vu->env);
 		float duty;
@@ -112,8 +120,8 @@ bool NAME(render)(
 	return on;
 }
 
-void NAME(noteoff)(
-	NAME(vst) *vu, NAME(bst) *bu,
+static void NAME(poly_noteoff)(
+	NAME(vst) *vu, NAME(cst) *cu,
 	int note,
 	float freq
 ){

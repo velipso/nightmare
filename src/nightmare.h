@@ -17,15 +17,9 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
-typedef void *(*nm_malloc_f)(size_t sz);
-typedef void *(*nm_realloc_f)(void *ptr, size_t sz);
-typedef void (*nm_free_f)(void *ptr);
-
-// all memory management is through these functions, which default to stdlib's malloc/realloc/free
-// overwrite these global variables with your own functions if desired
-extern nm_malloc_f  nm_malloc;
-extern nm_realloc_f nm_realloc;
-extern nm_free_f    nm_free;
+// k-block size, i.e., number of samples in a rendered block
+// do not change or you'll screw everything up :-)
+#define NM_K 200
 
 typedef struct {
 	float L;
@@ -33,7 +27,8 @@ typedef struct {
 } nm_sample_st;
 
 typedef enum {
-	NM_VT_OSC,
+	NM_VT_POLY,
+	NM_VT_MONO,
 	NM_VT_SAMPLE
 } nm_vtype;
 
@@ -80,8 +75,6 @@ typedef enum {
 	NM_SS_4X
 } nm_samplespeed;
 
-extern const nm_voice_st *nm_voices[];
-
 typedef struct {
 	int x1;
 	int y1;
@@ -92,17 +85,21 @@ typedef struct {
 } nm_note_st;
 
 typedef struct {
+	nm_sample_st kbuf[NM_K];
+	int kbuf_size;
+	int tempo; // stored as number of k-blocks before advancing a 1/16th note
 	struct {
 		int aid;
 		int priority;
 		int clip_id;
+		void *about;
 		float x;
 		float y;
 		float out;
 		uint64_t vdata[100];
 	} avoices[64];
 	struct {
-		const nm_voice_st *voice;
+		int voice_id;
 		int x;
 		int y;
 		int out;
@@ -116,26 +113,15 @@ typedef struct {
 	} clips[NM_CLIP_MAX];
 } nm_ctx_st, *nm_ctx;
 
-// init/term
+extern const nm_voice_st *nm_voices[];
+
+// initialize everything (once)
 void nm_init();
-void nm_term();
+void nm_clear(nm_ctx nm);
+void nm_render(nm_ctx nm, nm_sample_st *out, size_t outsize);
 
-// context
-void nm_ctx_make(nm_ctx nm);
-void nm_ctx_destroy(nm_ctx nm);
-void nm_ctx_render(nm_ctx nm, nm_sample_st *out, size_t outsize);
-
-static inline nm_ctx nm_ctx_new(){
-	nm_ctx nm = nm_malloc(sizeof(nm_ctx_st));
-	if (nm == NULL)
-		return NULL;
-	nm_ctx_make(nm);
-	return nm;
-}
-
-static inline void nm_ctx_free(nm_ctx nm){
-	nm_ctx_destroy(nm);
-	nm_free(nm);
+static inline float nm_getbpm(nm_ctx nm){
+	return 3600.0f / nm->tempo;
 }
 
 // clip
@@ -151,10 +137,7 @@ void nm_clip_noteon(nm_ctx nm, int clip_id, int note, int velocity);
 void nm_clip_noteoff(nm_ctx nm, int clip_id, int note, int velocity);
 
 static inline int nm_clip_getvoice(nm_ctx nm, int clip_id){
-	const nm_voice_st *v = nm->clips[clip_id].voice;
-	if (v == NULL)
-		return 0;
-	return v->voice_id;
+	return nm->clips[clip_id].voice_id;
 }
 
 static inline int nm_clip_getx(nm_ctx nm, int clip_id){
