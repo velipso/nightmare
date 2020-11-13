@@ -6,11 +6,23 @@
 #define NIGHTMARE__H
 
 #ifndef NM_CLIP_MAX
-#define NM_CLIP_MAX   200
+#define NM_CLIP_MAX      200
 #endif
 
 #ifndef NM_NOTES_MAX
-#define NM_NOTES_MAX  100
+#define NM_NOTES_MAX     100
+#endif
+
+#ifndef NM_CHANNELS_MAX
+#define NM_CHANNELS_MAX  6
+#endif
+
+#ifndef NM_BARS_MAX
+#define NM_BARS_MAX      100
+#endif
+
+#ifndef NM_AVOICES_MAX
+#define NM_AVOICES_MAX   (16 + NM_CHANNELS_MAX * 8)
 #endif
 
 #include <stdint.h>
@@ -97,7 +109,7 @@ typedef struct {
 		float y;
 		float out;
 		uint64_t vdata[100];
-	} avoices[64];
+	} avoices[NM_AVOICES_MAX];
 	struct {
 		int voice_id;
 		int x;
