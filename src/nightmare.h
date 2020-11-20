@@ -96,6 +96,14 @@ typedef struct {
 	int hold;
 } nm_note_st;
 
+typedef enum {
+	NM_FX_NONE,
+	NM_FX_VOLUME,
+	NM_FX_REVERB,
+	NM_FX_CLIPX,
+	NM_FX_CLIPY
+} nm_fx;
+
 typedef struct {
 	nm_sample_st kbuf[NM_K];
 	int kbuf_size;
