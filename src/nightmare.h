@@ -140,8 +140,12 @@ void nm_init();
 void nm_clear(nm_ctx nm);
 void nm_render(nm_ctx nm, nm_sample_st *out, size_t outsize);
 
+static inline float nm_getbpmfromtempo(int tempo){
+	return 3600.0f / tempo;
+}
+
 static inline float nm_getbpm(nm_ctx nm){
-	return 3600.0f / nm->tempo;
+	return nm_getbpmfromtempo(nm->tempo);
 }
 
 // clip
