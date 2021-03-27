@@ -86,6 +86,8 @@ static bool NAME(poly_render)(
 		float duty;
 		DUTY();
 
+		// TODO: this is wrong -- don't up and down sample every unison oscillator, up sample
+		// everything, then down sample at the very end, all at once
 	#if defined(OVERSAMPLE) && OVERSAMPLE > 1
 		#pragma unroll
 		for (int u = 0; u < UNISON; u++){
